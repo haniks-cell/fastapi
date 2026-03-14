@@ -1,20 +1,22 @@
 from time import time
 import uuid
-
+from jwt.exceptions import InvalidTokenError
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form
 from typing import Annotated, Any, Awaitable, Callable, Dict
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from database import session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
 import secrets
 from schemas.login import LoginCreate, TokenInfo
-from repositories.login import LoginRepository
+from repositories.login import LoginRepository, LoginRepositoryHelp
 router = APIRouter(
     prefix='/api/login',
     tags=['login']
 )
-lgrp = LoginRepository()
+lgrp = LoginRepositoryHelp()
+
+http_bearer = HTTPBearer()
 
 john = LoginCreate (username='john', password=lgrp.hash_password('qwerty'))
 sam = LoginCreate (username='sam', password=lgrp.hash_password('qwerty12345'))
@@ -34,7 +36,7 @@ def validate_auth (
     )
     if not (user := udb.get(username)):
         raise unauth
-    if not lgrp.validate_password(password=password, hash_password=user.password):
+    if not lgrp.validate_password(password=password, hash_password=user.password.encode()):
         raise unauth
     if not user.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='user inactive')
@@ -43,15 +45,57 @@ def validate_auth (
 @router.post('/login/', response_model=TokenInfo)
 async def auth_jwt(user: LoginCreate = Depends(validate_auth)):
     jwt_token = {
-        "sub": user.username,
+        "sub": '1',
         "username": user.username,
         "email": user.email
     }
     token = lgrp.encode_jwt(jwt_token)
     return TokenInfo (
         access_token=token,
-        token_type='Bearer'
+        token_type='Bearer' 
     )
+
+def get_user (
+        token: HTTPAuthorizationCredentials = Depends(http_bearer)
+) -> LoginCreate:
+    # print(token.credentials)
+    try:
+        payload = lgrp.decode_jwt(jwts=token.credentials)
+    except InvalidTokenError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='invalid token') #Signature has expired
+    # print(payload)
+    return LoginCreate(username=payload.username, password='qwerty')
+
+def get_current_user (user: LoginCreate = Depends(get_user)):
+    if not user.active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='user inactive')
+    return user
+
+@router.get("/user")
+async def auth_user_check(user: LoginCreate = Depends(get_current_user)):
+    return {
+        "username": user.username,
+        "email": user.email
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # async def get_session():
 #     async with session_maker() as session:
 #         yield session
