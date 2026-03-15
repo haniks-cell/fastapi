@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from models.product import Product
-from schemas.product import ProductCreate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from models.product import Product
+from schemas.product import ProductCreate
 
 class ProductRepository:
     def __init__(self, db: AsyncSession):

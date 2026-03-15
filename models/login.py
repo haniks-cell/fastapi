@@ -26,7 +26,8 @@ class RefreshTokens(Base):
     __tablename__='refresh_tokens'
     tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.tid"))
-    uuid: Mapped[str] = mapped_column(Text, default= lambda: uuid.uuid4())
+    uuid: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[int] = mapped_column(index=True)
 
     user: Mapped["Users"] = relationship(back_populates="refresh", uselist=False)
     # name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
