@@ -6,6 +6,7 @@ from database import session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
 from routers.category_rt import router as cat_rt
 from routers.login_rt import router as lg_rt
+from routers.products_rt import router as pr_rt
 import uvicorn
 from contextlib import asynccontextmanager
 from database import create_db
@@ -40,5 +41,6 @@ app.add_middleware(
 
 app.include_router(cat_rt)
 app.include_router(lg_rt)
+app.include_router(pr_rt)
 if __name__ == '__main__':
     uvicorn.run('main:app', reload=True)

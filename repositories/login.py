@@ -33,9 +33,11 @@ class LoginRepositoryHelp:
             jwts: str,
             key: str = setting.auth_jwt.public.read_text(),
             alhoritm: str = setting.auth_jwt.algorithm) -> TokenJwt:
+        # print('do')
         decoded = jwt.decode(jwts, key, algorithms=[alhoritm])
         # return decoded
-        return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], email=decoded['email'], exp=int(decoded['exp']), iat=int(decoded['iat']))
+        # print('posle')
+        return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], lvl_access=int(decoded['lvl_access']), exp=int(decoded['exp']), iat=int(decoded['iat']))
         # return TokenJwt(sub=1, username='fff', email=)
     
     def hash_password(self,password:str) -> bytes:

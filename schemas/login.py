@@ -44,7 +44,7 @@ class JwtAuth(BaseModel):
 class TokenJwt(BaseModel):
     sub: int
     username: str
-    email: str | None = None
+    lvl_access: int = 0
     exp: int #health
     iat: int #create
 

@@ -26,6 +26,7 @@ lgrp = LoginRepositoryHelp()
 
 # http_bearer = HTTPBearer()
 
+
 @router.put('/registration/', response_model=LoginCreateResponse)
 async def registration (userGet: LoginCreate, session: SesDep):
     rep = LoginRepository(session)
@@ -41,7 +42,7 @@ async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
     if user == None or not lgrp.validate_password(password=userGet.hash_password, hash_password=user.hash_password.encode()):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='inalid username or password')
     jwt_token = {
-        "sub": user.tid,
+        "sub": str(user.tid),
         "username": user.username,
         "lvl_access": user.lvl_access
     }
