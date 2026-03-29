@@ -1,6 +1,6 @@
 from time import time
 import uuid
-from jwt.exceptions import InvalidTokenError
+# from jwt.exceptions import InvalidTokenError
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form
 from typing import Annotated, Any, Awaitable, Callable, Dict, Union
 from sqlalchemy.ext.asyncio import async_sessionmaker

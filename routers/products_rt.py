@@ -1,5 +1,9 @@
+import json
 from time import time
 import uuid
+import asyncio
+from aiokafka import AIOKafkaProducer
+from aiokafka import AIOKafkaProducer
 from jwt.exceptions import InvalidTokenError
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form
 from typing import Annotated, Any, Awaitable, Callable, Dict, List, Union
@@ -15,6 +19,8 @@ from schemas.category import CategoryCreate, CategoryResponse
 from models.login import Users
 from repositories.product_rep import ProductRepository, CategoryRepository
 from schemas.product import ProductCreate, ProductResponse, ProductResponseArrEl
+
+from pydantic import BaseModel, Field
 router = APIRouter(
     prefix='/api/products',
     tags=['products']
@@ -26,6 +32,14 @@ async def get_session():
     async with session_maker() as session:
         yield session
 
+async def get_kafka():
+   serializer = lambda v: json.dumps(v).encode('utf-8')
+   async with AIOKafkaProducer(
+        bootstrap_servers='localhost:9092',
+        value_serializer=serializer  # <--- Вот здесь магия
+    ) as producer:
+        yield producer
+
 async def get_lvl_access(access: Annotated[str | None, Cookie()] = None) -> int:
     if access:
         return lgpr.decode_jwt(str(access)).lvl_access
@@ -34,13 +48,8 @@ async def get_lvl_access(access: Annotated[str | None, Cookie()] = None) -> int:
 
 SesDep = Annotated[AsyncSession, Depends(get_session)]
 AccDep = Annotated[int, Depends(get_lvl_access)]
+KafkaDep = Annotated[AIOKafkaProducer, Depends(get_kafka)]
 
-
-# @router.get('/products/')
-# async def get_all_products(session: SesDep):
-#     rep = ProductRepository(session)
-#     all = await rep.get_all()
-    
 @router.put('/add_cat/')
 async def add_categories(name: str, session: SesDep, lvl_access: AccDep):
     if lvl_access >= 3:
@@ -73,3 +82,16 @@ async def get_poduct(product_id: int, session: SesDep):
     rep = ProductRepository(session)
     product = await rep.get_by_id(product_id)
     return ProductResponse(id=product.id, name=product.name, description=product.description, price=product.price, category_id=product.category_id, image_url=product.image_url, created_at=product.created_at, category=CategoryResponse(id=product.category.id, slug=product.category.slug, name=product.category.name))
+
+class UserAction(BaseModel):
+    user_id: int
+    status: str
+    payload: str
+
+@router.get('/hello/')
+async def test (producer: KafkaDep): #producer: KafkaDep
+    data = UserAction(user_id=1, status='ok', payload='fdf')
+    print("Отправка словаря...")
+    await producer.send("my_test_topic", value=data.model_dump())
+    print("Данные успешно отправлены в формате JSON!")
+
