@@ -1,14 +1,10 @@
 import uuid
 
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Integer, String, ForeignKey, func, Text
 from typing import List, Optional
-from datetime import datetime, timezone
-from sqlalchemy.dialects.postgresql import ARRAY
-# from models.category import Category
 
-class Base(DeclarativeBase):
-    pass
+from .base import Base
 
 class Users(Base):
     __tablename__='users'

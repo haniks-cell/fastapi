@@ -10,8 +10,13 @@ from routers.products_rt import router as pr_rt
 import uvicorn
 from contextlib import asynccontextmanager
 from database import create_db
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from repositories.category_rep import CategoryRepository
+
+import logging
+import time
+from fastapi import Request
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,8 +25,34 @@ async def lifespan(app: FastAPI):
 
     yield  # В этой точке приложение начинает принимать запросы
     
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 app = FastAPI(docs_url='/api/dock', lifespan=lifespan)
+
+class ConsoleLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.perf_counter()
+        
+        # Выполняем запрос
+        response = await call_next(request)
+        
+        # Вычисляем время
+        process_time = (time.perf_counter() - start_time) * 1000  # переводим в мс
+        
+        # Вывод в консоль
+        logger.info(
+            f"Метод: {request.method} | "
+            f"Путь: {request.url.path} | "
+            f"Статус: {response.status_code} | "
+            f"Время: {process_time:.2f}ms"
+        )
+        
+        return response
+
+app.add_middleware(ConsoleLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

@@ -11,6 +11,9 @@ class Settings (BaseSettings):
     # CORS_ORIGINS: list
     STATIC_DIR: str
     IMAGE_DIR: str
+    REDIS_PASSWORD:str
+    REDIS_USER:str
+    REDIS_USER_PASSWORD:str
 
     # @property
     def get_db_url(self):
