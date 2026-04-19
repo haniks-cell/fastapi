@@ -1,12 +1,9 @@
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Integer, String, ForeignKey, func, Text
 from typing import List, Optional
-from datetime import datetime, timezone
-from sqlalchemy.dialects.postgresql import ARRAY
-# from models.category import Category
+from datetime import datetime
 
-class Base(DeclarativeBase):
-    pass
+from .base import Base
 
 class Product(Base):
     __tablename__='products'
@@ -34,4 +31,3 @@ class Category(Base):
         return f"<Category(id={self.id}, name='{self.name}')>"
     # slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
     # products: Mapped["Product"] = relationship(back_populates='category', uselist=False)
-

@@ -66,7 +66,7 @@ async def get_refresh_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='refresh not found')
     refresh_token = await rep.set_refresh(RefreshTokensCreate(user_id=token.user_id, uuid=uuid.uuid4().__str__()))
     jwt_token = {
-        "sub": token.user_id,
+        "sub": str(token.user_id),
         "username": token.user.username,
         "lvl_access": token.user.lvl_access
     }

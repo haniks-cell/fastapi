@@ -77,7 +77,7 @@ async def get_products(session: SesDep):
         resp.append(ProductResponseArrEl(id=el.id, name=el.name, description=el.description, price=el.price, category_id=el.category_id, image_url=el.image_url, created_at=el.created_at))
     return resp
 
-@router.get('{product_id}', response_model=ProductResponse)
+@router.get('/{product_id}/', response_model=ProductResponse)
 async def get_poduct(product_id: int, session: SesDep):
     rep = ProductRepository(session)
     product = await rep.get_by_id(product_id)
