@@ -14,6 +14,7 @@ class Settings (BaseSettings):
     REDIS_PASSWORD:str
     REDIS_USER:str
     REDIS_USER_PASSWORD:str
+    KAFKA_URL:str
 
     # @property
     def get_db_url(self):

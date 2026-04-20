@@ -13,6 +13,7 @@ from database import create_db
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from repositories.category_rep import CategoryRepository
+from kafka_config import kafka_manager
 
 import logging
 import time
@@ -22,9 +23,14 @@ from fastapi import Request
 async def lifespan(app: FastAPI):
     # await create_db_and_tables() 
     await create_db()
+    await kafka_manager.start()
 
     yield  # В этой точке приложение начинает принимать запросы
     
+    await kafka_manager.stop()
+
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",

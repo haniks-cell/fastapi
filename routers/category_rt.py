@@ -12,16 +12,12 @@ from repositories.product_rep import ProductRepository
 from schemas.category import CategoryCreate, CategoryResponse
 from schemas.product import ProductCreate
 
+from dependses import SesDep
+
 router = APIRouter(
     prefix='/api/categories',
     tags=['categories']
 )
-
-async def get_session():
-    async with session_maker() as session:
-        yield session
-
-SesDep = Annotated[AsyncSession, Depends(get_session)]
 
 @router.get("/", response_model=List[CategoryResponse], status_code=status.HTTP_200_OK)
 async def get_categories(session: SesDep):

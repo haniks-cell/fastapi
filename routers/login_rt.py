@@ -11,16 +11,14 @@ import secrets
 from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate
 from repositories.login import LoginRepository, LoginRepositoryHelp
 
+from dependses import SesDep
+
 from models.login import Users
 router = APIRouter(
     prefix='/api/auth',
     tags=['autenthication']
 )
-async def get_session():
-    async with session_maker() as session:
-        yield session
 
-SesDep = Annotated[AsyncSession, Depends(get_session)]
 
 lgrp = LoginRepositoryHelp()
 
