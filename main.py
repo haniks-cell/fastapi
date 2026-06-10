@@ -18,13 +18,26 @@ from kafka_config import kafka_manager
 import logging
 import time
 from fastapi import Request
+from dependses import SesDep, get_session
+from schemas.login import LoginCreate
+from repositories.login import LoginRepository, LoginRepositoryHelp
+
+from database import session_maker
+
+lgrp = LoginRepositoryHelp()
+
+async def create_admin():
+    async with session_maker() as session:
+        rep = LoginRepository(session)
+        userGet = LoginCreate(username='admin', hash_password=str(lgrp.hash_password('admin'))[1::].strip("'"), lvl_access=3, email='example@example.com')
+        user = await rep.set_user(userGet)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # await create_db_and_tables() 
     await create_db()
     await kafka_manager.start()
-
+    await create_admin()
     yield  # В этой точке приложение начинает принимать запросы
     
     await kafka_manager.stop()
