@@ -44,7 +44,6 @@ class LoginRepositoryHelp:
         salt = bcrypt.gensalt()
         pwd_bytes: bytes = password.encode()
         return bcrypt.hashpw(pwd_bytes, salt)
-    
     def validate_password (self, password: str, hash_password: bytes) -> bool:
         return bcrypt.checkpw(password.encode(), hash_password)
     
