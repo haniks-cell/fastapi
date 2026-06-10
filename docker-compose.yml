@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  fastapi_app:
+    build: .
+    container_name: fastapi_app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka: # Теперь приложение будет ждать, пока Kafka не станет 'healthy'
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   kafka:
     image: apache/kafka:3.7.0
     container_name: kafka
@@ -21,7 +37,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       
       # Настройка Кворума (KRaft)
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      # KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       
       # Важно для корректного старта одной ноды
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -29,8 +46,17 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       
+      # Разрешаем автоматическое создание топиков
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      
       # Генерируем ID кластера, если он не задан
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:29092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest

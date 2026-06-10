@@ -2,6 +2,7 @@ import asyncio
 from pydantic import BaseModel, Field
 from faststream import FastStream, Logger
 from faststream.kafka import KafkaBroker
+from config import settings
 
 # 1. Описываем модель данных (наша схема JSON)
 class UserAction(BaseModel):
@@ -9,8 +10,8 @@ class UserAction(BaseModel):
     status: str
     payload: str
 
-# 2. Настраиваем брокер (используем наш рабочий localhost:9092)
-broker = KafkaBroker("localhost:9092")
+# 2. Настраиваем брокер, используя URL из настроек
+broker = KafkaBroker(settings.KAFKA_URL)
 app = FastStream(broker)
 
 # 3. Подписываемся на топик

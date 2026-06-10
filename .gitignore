@@ -68,7 +68,7 @@ coverage
 /cypress/videos/
 /cypress/screenshots/
 
-*.env
+.env
 
 # Editor directories and files
 .vscode/*
@@ -88,3 +88,4 @@ celerybeat-schedule-wal
 kafka_consumer/
 redisdata/
 venv/
+decorator.py
