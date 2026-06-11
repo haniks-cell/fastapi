@@ -9,8 +9,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      kafka: # Теперь приложение будет ждать, пока Kafka не станет 'healthy'
-        condition: service_healthy
+      # kafka: # Теперь приложение будет ждать, пока Kafka не станет 'healthy'
+      #   condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -20,8 +20,8 @@ services:
   kafka:
     image: apache/kafka:3.7.0
     container_name: kafka
-    ports:
-      - "9092:9092"
+    # ports:
+    #   - "9092:9092"
     environment:
       # Настройки узла
       KAFKA_NODE_ID: 1
@@ -77,8 +77,8 @@ services:
       POSTGRES_DB: ${DB_NAME}
     # volumes:
     #   - ./scripts/:/docker-entrypoint-initdb.d/
-    ports:
-      - "5438:5432"
+    # ports:
+    #   - "5438:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres_user -d postgres_db" ]
       interval: 30s
@@ -94,8 +94,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_USER=${REDIS_USER}
       - REDIS_USER_PASSWORD=${REDIS_USER_PASSWORD}
-    ports:
-      - "6380:6379"
+    # ports:
+    #   - "6380:6379"
     volumes:
       - ./redisdata:/data
     deploy:
