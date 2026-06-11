@@ -11,7 +11,7 @@ class TokenInfo(BaseModel):
     token_type: str= 'Bearer'
 
 class ResponseServiceLogin (BaseModel):
-    tid: int
+    # tid: int
     token: str
     refresh: str
 

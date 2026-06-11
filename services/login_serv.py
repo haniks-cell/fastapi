@@ -31,7 +31,20 @@ class LoginService:
         token = self.lgrp.encode_jwt(jwt_token)
         refresh = uuid.uuid4().__str__()
         await self.rep.set_refresh(RefreshTokensCreate(user_id=user.tid, uuid=refresh))
-        return ResponseServiceLogin(tid=user.tid, token=token, refresh=refresh)
+        return ResponseServiceLogin(token=token, refresh=refresh)
+    
+    async def refresh_user (self, refresh: str) -> ResponseServiceLogin:
+        token = await self.rep.is_exist(refresh)
+        if not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='refresh not found')
+        refresh_token = await self.rep.set_refresh(RefreshTokensCreate(user_id=token.user_id, uuid=uuid.uuid4().__str__()))
+        jwt_token = {
+            "sub": str(token.user_id),
+            "username": token.user.username,
+            "lvl_access": token.user.lvl_access
+        }
+        access = self.lgrp.encode_jwt(jwt_token)
+        return ResponseServiceLogin(token=access, refresh=refresh_token.uuid)
 
 
     # async def get_all_categories(self) -> List[CategoryResponse]:

@@ -1,14 +1,6 @@
 from time import time
-import uuid
-# from jwt.exceptions import InvalidTokenError
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form
 from typing import Annotated, Any, Awaitable, Callable, Dict, Union
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from database import session_maker
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
-import secrets
-from sqlalchemy.exc import IntegrityError
 from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp
 from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
@@ -37,23 +29,9 @@ async def registration (userGet: LoginCreateInp, session: SesDep):
 
 @router.post('/login/', response_model=TokenInfo)
 async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
-    # rep = LoginRepository(session)
-    # user = await rep.get_by_username(userGet.username)
-    # if user == None or not lgrp.validate_password(password=userGet.hash_password, hash_password=user.hash_password.encode()):
-    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='inalid username or password')
-    # jwt_token = {
-    #     "sub": str(user.tid),
-    #     "username": user.username,
-    #     "lvl_access": user.lvl_access
-    # }
-    # token = lgrp.encode_jwt(jwt_token)
     rep = LoginService(session)
     resp = await rep.login_user(userGet)
-
     response.set_cookie(key='access', value=resp.token, httponly=True)
-    # refresh = uuid.uuid4().__str__()
-
-    # await rep.set_refresh(RefreshTokensCreate(user_id=resp.user.tid, uuid=refresh))
     response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
     return TokenInfo (access_token=resp.token, refresh_token=resp.refresh)
 
@@ -63,17 +41,8 @@ async def get_refresh_token(
     response: Response,
     refresh: Annotated[str | None, Cookie()] = None
 ):
-    rep = LoginRepository(session)
-    token = await rep.is_exist(refresh)
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='refresh not found')
-    refresh_token = await rep.set_refresh(RefreshTokensCreate(user_id=token.user_id, uuid=uuid.uuid4().__str__()))
-    jwt_token = {
-        "sub": str(token.user_id),
-        "username": token.user.username,
-        "lvl_access": token.user.lvl_access
-    }
-    access = lgrp.encode_jwt(jwt_token)
-    response.set_cookie(key='access', value=access, httponly=True)
-    response.set_cookie(key='refresh', value=refresh_token.uuid, httponly=True)
-    return TokenInfo (access_token=access, refresh_token=refresh_token.uuid)
+    rep = LoginService(session)
+    resp = await rep.refresh_user(refresh)
+    response.set_cookie(key='access', value=resp.token, httponly=True)
+    response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
+    return TokenInfo (access_token=resp.token, refresh_token=resp.refresh)
