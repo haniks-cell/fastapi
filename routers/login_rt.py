@@ -37,22 +37,25 @@ async def registration (userGet: LoginCreateInp, session: SesDep):
 
 @router.post('/login/', response_model=TokenInfo)
 async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
-    rep = LoginRepository(session)
-    user = await rep.get_by_username(userGet.username)
-    if user == None or not lgrp.validate_password(password=userGet.hash_password, hash_password=user.hash_password.encode()):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='inalid username or password')
-    jwt_token = {
-        "sub": str(user.tid),
-        "username": user.username,
-        "lvl_access": user.lvl_access
-    }
-    token = lgrp.encode_jwt(jwt_token)
-    response.set_cookie(key='access', value=token, httponly=True)
-    refresh = uuid.uuid4().__str__()
+    # rep = LoginRepository(session)
+    # user = await rep.get_by_username(userGet.username)
+    # if user == None or not lgrp.validate_password(password=userGet.hash_password, hash_password=user.hash_password.encode()):
+    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='inalid username or password')
+    # jwt_token = {
+    #     "sub": str(user.tid),
+    #     "username": user.username,
+    #     "lvl_access": user.lvl_access
+    # }
+    # token = lgrp.encode_jwt(jwt_token)
+    rep = LoginService(session)
+    resp = await rep.login_user(userGet)
 
-    await rep.set_refresh(RefreshTokensCreate(user_id=user.tid, uuid=refresh))
-    response.set_cookie(key='refresh', value=refresh, httponly=True)
-    return TokenInfo (access_token=token, refresh_token=refresh)
+    response.set_cookie(key='access', value=resp.token, httponly=True)
+    # refresh = uuid.uuid4().__str__()
+
+    # await rep.set_refresh(RefreshTokensCreate(user_id=resp.user.tid, uuid=refresh))
+    response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
+    return TokenInfo (access_token=resp.token, refresh_token=resp.refresh)
 
 @router.get("/refresh/", response_model=TokenInfo)
 async def get_refresh_token(

@@ -10,6 +10,10 @@ class TokenInfo(BaseModel):
     refresh_token: str
     token_type: str= 'Bearer'
 
+class ResponseServiceLogin (BaseModel):
+    tid: int
+    token: str
+    refresh: str
 
 class LoginCreateInp(BaseModel):
     username: str
