@@ -9,7 +9,7 @@ from .base import Base
 class Users(Base):
     __tablename__='users'
     tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
-    username: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(40), nullable=False, index=True, unique=True)
     hash_password: Mapped[str] = mapped_column(Text)
     email: Mapped[str] = mapped_column(String(40))
     lvl_access: Mapped[int] = mapped_column(index=True)

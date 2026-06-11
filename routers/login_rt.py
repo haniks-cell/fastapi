@@ -8,6 +8,7 @@ from database import session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
 import secrets
+from sqlalchemy.exc import IntegrityError
 from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate
 from repositories.login import LoginRepository, LoginRepositoryHelp
 
@@ -30,7 +31,10 @@ async def registration (userGet: LoginCreate, session: SesDep):
     rep = LoginRepository(session)
     userGet.lvl_access=0
     userGet.hash_password = str(lgrp.hash_password(userGet.hash_password))[1::].strip("'")
-    user = await rep.set_user(userGet)
+    try:
+        user = await rep.set_user(userGet)
+    except IntegrityError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this username already exists")
     return LoginCreateResponse(ok=True)
 
 @router.post('/login/', response_model=TokenInfo)
@@ -96,7 +100,3 @@ async def get_refresh_token(
 #         "username": user.username,
 #         "email": user.email
 #     }
-
-
-
-

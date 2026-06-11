@@ -20,7 +20,7 @@ class AdminRepository:
     # async def upd_jwt(self, Id: int) -> bool:
     #     query = delete(RefreshTokens).where(RefreshTokens.user_id == Id)
     #     res = await self.db.execute(query)
-    async def change_lvl_access(self, Id: int) -> Users:
+    async def get_by_id(self, Id: int) -> Users:
         query = select(Users).where(Users.tid == Id)
         res = await self.db.execute(query)
         return res.scalar()
@@ -28,6 +28,13 @@ class AdminRepository:
         query = select(Users).where(Users.username == username)
         res = await self.db.execute(query)
         return res.scalar().tid
+    
+    async def update_user(self, user_to_update: Users) -> Users:
+        """Сохраняет изменения для существующего пользователя."""
+        self.db.add(user_to_update)
+        await self.db.commit()
+        await self.db.refresh(user_to_update)
+        return user_to_update
     # async def set_user (self, user: LoginCreate) -> Users:
     #     db_user = Users(**user.model_dump())
     #     self.db.add(db_user)

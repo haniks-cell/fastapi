@@ -21,7 +21,7 @@ from repositories.product_rep import ProductRepository, CategoryRepository
 from schemas.product import ProductCreate, ProductResponse, ProductResponseArrEl
 from kafka_config import kafka_manager
 
-from dependses import SesDep
+from dependses import SesDep, AccDep
 
 from pydantic import BaseModel, Field
 router = APIRouter(
@@ -33,8 +33,8 @@ lgpr = LoginRepositoryHelp()
 
 
 
-async def get_kafka():
-    return
+# async def get_kafka():
+#     return
 # async def get_kafka():
 #     serializer = lambda v: json.dumps(v).encode('utf-8')
 #     async with AIOKafkaProducer(
@@ -43,14 +43,10 @@ async def get_kafka():
 #         ) as producer:
 #             yield producer
 
-async def get_lvl_access(access: Annotated[str | None, Cookie()] = None) -> int:
-    if access:
-        return lgpr.decode_jwt(str(access)).lvl_access
-    else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='user not auth')
 
 
-AccDep = Annotated[int, Depends(get_lvl_access)]
+
+
 # KafkaDep = Annotated[AIOKafkaProducer, Depends(get_kafka)]
 
 @router.put('/add_cat/')

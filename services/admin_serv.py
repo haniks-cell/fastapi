@@ -5,15 +5,22 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.admin_rep import AdminRepository
-from schemas.admin import GetAccountAnotherUser
+from schemas.admin import GetAccountAnotherUser, GetAccountAnotherUserEmail
 
 class AdminService:
     def __init__(self, db: AsyncSession):
         self.rep = AdminRepository(db)
     async def change_lvl_access(self, user: GetAccountAnotherUser) -> bool:
-        new_user = await self.rep.change_lvl_access(user.id_user)
-        new_user.lvl_access = user.new_lvl_access
-        self.rep.db.add(new_user)
-        await self.rep.db.commit()
-        await self.rep.db.refresh(new_user)
+        user_to_update = await self.rep.get_by_id(user.id_user)
+        if not user_to_update:
+            return False # Пользователь не найден
+        user_to_update.lvl_access = user.new_lvl_access
+        await self.rep.update_user(user_to_update)
+        return True
+    async def change_email(self, user: GetAccountAnotherUserEmail) -> bool:
+        user_to_update = await self.rep.get_by_id(user.id_user)
+        if not user_to_update:
+            return False # Пользователь не найден
+        user_to_update.email = user.new_email
+        await self.rep.update_user(user_to_update)
         return True

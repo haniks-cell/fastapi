@@ -1,10 +1,13 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
 class GetAccountAnotherUser(BaseModel):
     id_user: int
     new_lvl_access: int 
 
+class GetAccountAnotherUserEmail(BaseModel):
+    id_user: int
+    new_email: EmailStr
 class ResponseId (BaseModel):
     id_user: int
 
