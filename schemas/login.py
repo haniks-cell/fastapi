@@ -1,6 +1,7 @@
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 BASE_DIR = Path(__file__).parent.parent
 
@@ -10,12 +11,15 @@ class TokenInfo(BaseModel):
     token_type: str= 'Bearer'
 
 
-class LoginCreate(BaseModel):
+class LoginCreateInp(BaseModel):
     username: str
     hash_password: str
-    lvl_access: int = 0
-    email: EmailStr
+    email: Optional[EmailStr] = None
     # active: bool = True
+
+class LoginCreate (LoginCreateInp):
+    lvl_access: int = 0
+    # email:EmailStr
 
 class LoginCreateResponse(BaseModel):
     ok: bool

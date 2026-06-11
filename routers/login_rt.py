@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
 import secrets
 from sqlalchemy.exc import IntegrityError
-from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate
+from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp
 from repositories.login import LoginRepository, LoginRepositoryHelp
+from services.login_serv import LoginService
+
 
 from dependses import SesDep
 
@@ -25,17 +27,13 @@ lgrp = LoginRepositoryHelp()
 
 # http_bearer = HTTPBearer()
 
-
+ 
 @router.put('/registration/', response_model=LoginCreateResponse)
-async def registration (userGet: LoginCreate, session: SesDep):
-    rep = LoginRepository(session)
-    userGet.lvl_access=0
-    userGet.hash_password = str(lgrp.hash_password(userGet.hash_password))[1::].strip("'")
-    try:
-        user = await rep.set_user(userGet)
-    except IntegrityError:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this username already exists")
-    return LoginCreateResponse(ok=True)
+async def registration (userGet: LoginCreateInp, session: SesDep):
+    rep = LoginService(session)
+    return await rep.create_user(LoginCreate(username=userGet.username,
+                                             hash_password=str(lgrp.hash_password(userGet.hash_password))[1::].strip("'"),
+                                             lvl_access=0, email=userGet.email))
 
 @router.post('/login/', response_model=TokenInfo)
 async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
@@ -76,27 +74,3 @@ async def get_refresh_token(
     response.set_cookie(key='access', value=access, httponly=True)
     response.set_cookie(key='refresh', value=refresh_token.uuid, httponly=True)
     return TokenInfo (access_token=access, refresh_token=refresh_token.uuid)
-
-
-# def get_user (
-#         token: HTTPAuthorizationCredentials = Depends(http_bearer)
-# ) -> LoginCreate:
-#     # print(token.credentials)
-#     try:
-#         payload = lgrp.decode_jwt(jwts=token.credentials)
-#     except InvalidTokenError as e:
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='invalid token') #Signature has expired
-#     # print(payload)
-#     return LoginCreate(username=payload.username, password='qwerty')
-
-# def get_current_user (user: LoginCreate = Depends(get_user)):
-#     if not user.active:
-#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='user inactive')
-#     return user
-
-# @router.get("/user")
-# async def auth_user_check(user: LoginCreate = Depends(get_current_user)):
-#     return {
-#         "username": user.username,
-#         "email": user.email
-#     }

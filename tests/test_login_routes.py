@@ -13,7 +13,7 @@ async def test_registration_success(client: AsyncClient):
     user_data = {
         "username": "newuser",
         "hash_password": "securepassword",
-        "email": "newuser@example.com"
+        "email": "another@example.com"
     }
     response = await client.put("/api/auth/registration/", json=user_data)
 

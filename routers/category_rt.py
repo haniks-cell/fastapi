@@ -23,12 +23,6 @@ router = APIRouter(
 async def get_categories(session: SesDep):
     service = CategoryService(session)
     return await service.get_all_categories()
-    # # cf = ProductRepository(session)
-    # # pd = ProductCreate(name='телефон', description='Хороший телефон', price=3.5, category_id=1, image_url="static/image")
-    # cf = CategoryRepository(session)
-    # return {'ok': await cf.get_by_id(1)}
-
-    # # return {'test': await cf.create(pd)}
 
 @router.get('/{category_id}', response_model=CategoryResponse, status_code=status.HTTP_200_OK)
 async def get_category(category_id: int, session: SesDep):
