@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from routers.category_rt import router as cat_rt
 from routers.login_rt import router as lg_rt
 from routers.products_rt import router as pr_rt
+from routers.admin_rt import router as admin_rt
 import uvicorn
 from contextlib import asynccontextmanager
 from database import create_db
@@ -29,7 +30,7 @@ lgrp = LoginRepositoryHelp()
 async def create_admin():
     async with session_maker() as session:
         rep = LoginRepository(session)
-        userGet = LoginCreate(username='admin', hash_password=str(lgrp.hash_password('admin'))[1::].strip("'"), lvl_access=3, email='example@example.com')
+        userGet = LoginCreate(username='admin', hash_password=str(lgrp.hash_password('admin'))[1::].strip("'"), lvl_access=5, email='example@example.com')
         user = await rep.set_user(userGet)
 
 @asynccontextmanager
@@ -92,5 +93,7 @@ app.add_middleware(
 app.include_router(cat_rt)
 app.include_router(lg_rt)
 app.include_router(pr_rt)
+app.include_router(admin_rt)
+
 if __name__ == '__main__':
     uvicorn.run('main:app', reload=True)
