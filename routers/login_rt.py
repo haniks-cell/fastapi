@@ -14,11 +14,7 @@ router = APIRouter(
     tags=['autenthication']
 )
 
-
 lgrp = LoginRepositoryHelp()
-
-# http_bearer = HTTPBearer()
-
  
 @router.put('/registration/', response_model=LoginCreateResponse)
 async def registration (userGet: LoginCreateInp, session: SesDep):
