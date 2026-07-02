@@ -6,7 +6,7 @@ from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
 
 
-from dependses import SesDep, RedisDep
+from dependses import SesDep, RedisDep, ServDep
 
 from models.login import Users
 router = APIRouter(
@@ -17,16 +17,14 @@ router = APIRouter(
 lgrp = LoginRepositoryHelp()
  
 @router.put('/registration/', response_model=LoginCreateResponse)
-async def registration (userGet: LoginCreateInp, session: SesDep, redis: RedisDep):
-    rep = LoginService(session)
+async def registration (userGet: LoginCreateInp, redis: RedisDep, service: ServDep):
     await redis.set('user', str(userGet.username), ex=600)
-    return await rep.create_user(LoginCreate(username=userGet.username,
-                                             hash_password=str(lgrp.hash_password(userGet.hash_password))[1::].strip("'"),
-                                             lvl_access=0, email=userGet.email))
+    return await service.create_user(LoginCreate(username=userGet.username,
+                                                  hash_password=str(lgrp.hash_password(userGet.hash_password))[1::].strip("'"),
+                                                  lvl_access=0, email=userGet.email))
 
 @router.post('/login/', response_model=TokenInfo)
-async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
-    rep = LoginService(session)
+async def auth_jwt(userGet: LoginGet, rep: ServDep, response: Response):
     resp = await rep.login_user(userGet)
     response.set_cookie(key='access', value=resp.token, httponly=True)
     response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
@@ -34,11 +32,11 @@ async def auth_jwt(userGet: LoginGet, session: SesDep, response: Response):
 
 @router.get("/refresh/", response_model=TokenInfo)
 async def get_refresh_token(
-    session: SesDep,
+    rep: ServDep,
     response: Response,
     refresh: Annotated[str | None, Cookie()] = None
 ):
-    rep = LoginService(session)
+    # rep = LoginService(session)
     resp = await rep.refresh_user(refresh)
     response.set_cookie(key='access', value=resp.token, httponly=True)
     response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
