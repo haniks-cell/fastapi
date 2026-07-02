@@ -12,9 +12,9 @@ class Settings (BaseSettings):
     STATIC_DIR: str
     IMAGE_DIR: str
     REDIS_URL: str
-    REDIS_PASSWORD:str
-    REDIS_USER:str
-    REDIS_USER_PASSWORD:str
+    # REDIS_PASSWORD:str
+    # REDIS_USER:str
+    # REDIS_USER_PASSWORD:str
     KAFKA_URL:str
 
     # @property
