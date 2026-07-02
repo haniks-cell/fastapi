@@ -19,12 +19,18 @@ router = APIRouter(
     tags=['categories']
 )
 
+async def get_category_service(session: SesDep) -> CategoryService:
+    return CategoryService(session)
+
+catrepDep = Annotated[CategoryService, Depends(get_category_service)]
+
+
 @router.get("/", response_model=List[CategoryResponse], status_code=status.HTTP_200_OK)
-async def get_categories(session: SesDep):
-    service = CategoryService(session)
+async def get_categories(service: catrepDep):
+    # service = CategoryService(session)
     return await service.get_all_categories()
 
 @router.get('/{category_id}', response_model=CategoryResponse, status_code=status.HTTP_200_OK)
-async def get_category(category_id: int, session: SesDep):
-    service = CategoryService(session)
+async def get_category(category_id: int, service: catrepDep):
+    # service = CategoryService(session)
     return await service.get_category_by_id(category_id)

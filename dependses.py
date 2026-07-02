@@ -20,8 +20,6 @@ async def get_session():
     async with session_maker() as session:
         yield session
 
-async def get_login_service(session: AsyncSession = Depends(get_session)) -> LoginService:
-    return LoginService(session)
 
 async def get_redis():
     return aioredis.from_url(settings.get_redis_url(), decode_responses=True)
@@ -29,4 +27,6 @@ async def get_redis():
 SesDep = Annotated[AsyncSession, Depends(get_session)]
 AccDep = Annotated[int, Depends(get_lvl_access)]
 RedisDep = Annotated[aioredis.Redis, Depends(get_redis)]
+async def get_login_service(session: SesDep) -> LoginService:
+    return LoginService(session)
 ServDep = Annotated[LoginService, Depends(get_login_service)]

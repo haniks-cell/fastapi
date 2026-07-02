@@ -31,7 +31,14 @@ router = APIRouter(
 
 lgpr = LoginRepositoryHelp()
 
+async def get_product_repository(session: SesDep) -> ProductRepository:
+    return ProductRepository(session)
 
+async def get_category_repository(session: SesDep) -> CategoryRepository:
+    return CategoryRepository(session)
+
+prodrepDep = Annotated[ProductRepository, Depends(get_product_repository)]
+catrepDep = Annotated[CategoryRepository, Depends(get_category_repository)]
 
 # async def get_kafka():
 #     return
@@ -50,26 +57,26 @@ lgpr = LoginRepositoryHelp()
 # KafkaDep = Annotated[AIOKafkaProducer, Depends(get_kafka)]
 
 @router.put('/add_cat/')
-async def add_categories(name: str, session: SesDep, lvl_access: AccDep):
+async def add_categories(name: str, rep: catrepDep, lvl_access: AccDep):
     if lvl_access >= 3:
-        rep = CategoryRepository(session)
+        # rep = CategoryRepository(session)
         await rep.create(CategoryCreate(name=name, slug=slugify(name)))
         return {'ok': lvl_access}
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='not roule')
 
 @router.put('/add_prod/')
-async def add_products(name: ProductCreate, session: SesDep, lvl_access: AccDep):
+async def add_products(name: ProductCreate, rep: prodrepDep, lvl_access: AccDep):
     if lvl_access >= 3:
-        rep = ProductRepository(session)
+        # rep = ProductRepository(session)
         await rep.create(name)
         return {'ok': True}
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='not roule')
     
 @router.get('/products/', response_model=List[ProductResponseArrEl])
-async def get_products(session: SesDep):
-    rep = ProductRepository(session)
+async def get_products(rep: prodrepDep):
+    # rep = ProductRepository(session)
     prodcts = await rep.get_all()
     resp = []
     for el in prodcts:
@@ -90,7 +97,7 @@ async def test (): #producer: KafkaDep
     return {"status": "message sent to kafka"}
 
 @router.get('/{product_id}/', response_model=ProductResponse)
-async def get_poduct(product_id: int, session: SesDep):
-    rep = ProductRepository(session)
+async def get_poduct(product_id: int, rep: prodrepDep):
+    # rep = ProductRepository(session)
     product = await rep.get_by_id(product_id)
     return ProductResponse(id=product.id, name=product.name, description=product.description, price=product.price, category_id=product.category_id, image_url=product.image_url, created_at=product.created_at, category=CategoryResponse(id=product.category.id, slug=product.category.slug, name=product.category.name))

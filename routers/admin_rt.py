@@ -33,11 +33,16 @@ router = APIRouter(
     dependencies=[Depends(admin_required)]
 )
 
+async def get_admin_service(session: SesDep) -> AdminService:
+    return AdminService(session)
+
+adminservDep = Annotated[AdminService, Depends(get_admin_service)]
+
 @router.post('/change_lvl_access/', response_model=AdminStatusResponse, status_code=status.HTTP_200_OK)
-async def change_lvl_access (user: GetAccountAnotherUser, session: SesDep, lvl: AccDep):
+async def change_lvl_access (user: GetAccountAnotherUser, serv: adminservDep, lvl: AccDep):
     if user.new_lvl_access >= lvl:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your level access less than or equal to the level you want to change")
-    serv = AdminService(session)
+    # serv = AdminService(session)
     if not await serv.change_lvl_access(GetAccountAnotherUser(id_user=user.id_user, new_lvl_access=user.new_lvl_access)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='user not found')
     return AdminStatusResponse(ok=True)
@@ -48,8 +53,8 @@ async def get_id_by_username (username: str, session: SesDep):
     return ResponseId(id_user=await rep.get_by_username(username))
 
 @router.post('/change_email/', response_model=AdminStatusResponse, status_code=status.HTTP_200_OK)
-async def change_email (email: GetAccountAnotherUserEmail, session: SesDep, lvl: AccDep):
-    serv = AdminService(session)
+async def change_email (email: GetAccountAnotherUserEmail, serv: adminservDep, lvl: AccDep):
+    # serv = AdminService(session)
     if not await serv.change_email(email):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='user not found')
     return AdminStatusResponse(ok=True)
