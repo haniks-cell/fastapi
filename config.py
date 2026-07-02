@@ -11,6 +11,7 @@ class Settings (BaseSettings):
     # CORS_ORIGINS: list
     STATIC_DIR: str
     IMAGE_DIR: str
+    REDIS_URL: str
     REDIS_PASSWORD:str
     REDIS_USER:str
     REDIS_USER_PASSWORD:str
@@ -21,5 +22,8 @@ class Settings (BaseSettings):
         return (f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASS}@"
                 f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}")
     model_config = SettingsConfigDict(env_file='.env')
+
+    def get_redis_url(self):
+        return f'redis://{self.REDIS_URL}/0'
 
 settings = Settings()

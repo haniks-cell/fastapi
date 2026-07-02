@@ -6,7 +6,7 @@ from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
 
 
-from dependses import SesDep
+from dependses import SesDep, RedisDep
 
 from models.login import Users
 router = APIRouter(
@@ -17,8 +17,9 @@ router = APIRouter(
 lgrp = LoginRepositoryHelp()
  
 @router.put('/registration/', response_model=LoginCreateResponse)
-async def registration (userGet: LoginCreateInp, session: SesDep):
+async def registration (userGet: LoginCreateInp, session: SesDep, redis: RedisDep):
     rep = LoginService(session)
+    await redis.set('user', str(userGet.username), ex=600)
     return await rep.create_user(LoginCreate(username=userGet.username,
                                              hash_password=str(lgrp.hash_password(userGet.hash_password))[1::].strip("'"),
                                              lvl_access=0, email=userGet.email))
