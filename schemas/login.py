@@ -5,6 +5,9 @@ from typing import Optional
 
 BASE_DIR = Path(__file__).parent.parent
 
+class confirmEmail(BaseModel):
+    token: str
+
 class TokenInfo(BaseModel):
     access_token: str
     refresh_token: str

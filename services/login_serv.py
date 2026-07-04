@@ -1,12 +1,13 @@
 from typing import List
+# from dependses import RedisDep
 from repositories.login import LoginRepository, LoginRepositoryHelp
-from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, ResponseServiceLogin, RefreshTokensCreate
+from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, ResponseServiceLogin, RefreshTokensCreate, LoginCreateInp
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
-
-
+import uuid, asyncio
+from config import settings
+import redis.asyncio as aioredis
 class LoginService:
     def __init__(self, db: AsyncSession):
         self.rep = LoginRepository(db)
@@ -46,6 +47,18 @@ class LoginService:
         access = self.lgrp.encode_jwt(jwt_token)
         return ResponseServiceLogin(token=access, refresh=refresh_token.uuid)
 
+    async def isExistUser (self, user: LoginCreateInp) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        if await redis.get(f"confirm_username:{user.username}") or await self.rep.get_by_username(user.username):
+            raise HTTPException(status_code=400, detail="username существует")
+        
+        if len(await self.rep.get_by_email(user.email)) >3:
+            raise HTTPException(status_code=400, detail="email существует")
+        return True
+    async def set_one_time_token(self, userGet: LoginCreateInp, token: str) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        await asyncio.gather(redis.set(f"confirm_username:{userGet.username}", token, ex=600), redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600))
+    
 
     # async def get_all_categories(self) -> List[CategoryResponse]:
     #     categories = await self.repository.get_all()

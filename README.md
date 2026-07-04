@@ -38,3 +38,5 @@ REDIS_PASSWORD=WRITE_YOUR_PASSWORD_HERE
 REDIS_USER=fastapi
 REDIS_USER_PASSWORD=WRITE_YOUR_PASSWORD_HERE
 KAFKA_URL=kafka:29092 #localhost:9092
+
+ЕСЛИ нет jwt в блоке админ, то проект крашится

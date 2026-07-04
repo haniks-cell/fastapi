@@ -83,3 +83,8 @@ class LoginRepository:
         query = select(RefreshTokens).where(RefreshTokens.uuid == uuid, RefreshTokens.expires_at > int(datetime.now(timezone.utc).timestamp())).options(joinedload(RefreshTokens.user))
         res = await self.db.execute(query)
         return res.scalar()
+    
+    async def get_by_email (self, email: str) -> Optional[List[Users]]:
+        query = select(Users).where(Users.email == email)
+        res = await self.db.execute(query)
+        return res.unique().scalars().all()
