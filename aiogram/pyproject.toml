@@ -1,0 +1,15 @@
+[project]
+name = "telegram-magiclink-bot"
+version = "1.0.0"
+description = "Telegram bot that listens to Kafka magiclink topic and forwards links to users"
+requires-python = ">=3.10"
+
+dependencies = [
+    "aiogram>=3.0.0",
+    "aiokafka>=0.10.0",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+start-bot = "aiogram_bot:main"
