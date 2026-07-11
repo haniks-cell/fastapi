@@ -50,10 +50,10 @@ class LoginService:
     async def isExistUser (self, user: LoginCreateInp) -> bool:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         if await redis.get(f"confirm_username:{user.username}") or await self.rep.get_by_username(user.username):
-            raise HTTPException(status_code=400, detail="username существует")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
         
         if len(await self.rep.get_by_email(user.email)) >3:
-            raise HTTPException(status_code=400, detail="email существует")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already exists")
         return True
     async def set_one_time_token(self, userGet: LoginCreateInp, token: str) -> bool:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)

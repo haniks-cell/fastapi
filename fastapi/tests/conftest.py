@@ -76,6 +76,11 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 @pytest.fixture(scope="function")
+async def redis() -> AsyncGenerator[aioredis.Redis, None]:
+    """Фикстура, предоставляющая Redis для тестов."""
+    return aioredis.from_url(f'redis://localhost:6379/0', decode_responses=True)
+
+@pytest.fixture(scope="function")
 async def admin_user(db: AsyncSession):
     """Фикстура для создания администратора в тестовой БД."""
     admin = Users(

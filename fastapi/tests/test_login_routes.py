@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as aioredis
 
 from models.login import Users
 from repositories.login import LoginRepositoryHelp
@@ -9,18 +10,23 @@ pytestmark = pytest.mark.asyncio
 
 lgrp = LoginRepositoryHelp()
 
-async def test_registration_success(client: AsyncClient):
+async def test_registration_success(client: AsyncClient, redis: aioredis.Redis):
     user_data = {
         "username": "newuser",
         "hash_password": "securepassword",
         "email": "another@example.com"
     }
+    await redis.delete(f"confirm_username:newuser")
     response = await client.put("/api/auth/registration/", json=user_data)
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
 
-async def test_registration_duplicate_username(client: AsyncClient, db: AsyncSession):
+    response = await client.put("/api/auth/registration/", json=user_data)
+    assert response.status_code == 409
+    assert response.json() == {"detail": "username already exists"}
+
+async def test_registration_duplicate_username_DB(client: AsyncClient, db: AsyncSession):
     # Создаем пользователя напрямую в БД
     existing_user = Users(username="existinguser", hash_password=lgrp.hash_password("password").decode('utf-8'), email="existing@example.com", lvl_access=0)
     db.add(existing_user)
@@ -34,7 +40,19 @@ async def test_registration_duplicate_username(client: AsyncClient, db: AsyncSes
     response = await client.put("/api/auth/registration/", json=user_data)
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "User with this username already exists"}
+    assert response.json() == {"detail": "username already exists"}
+
+async def test_registration_duplicate_username_redis(client: AsyncClient, redis: aioredis.Redis):
+    await redis.set(f"confirm_username:existinguserredis", "token", ex=600)
+    user_data = {
+        "username": "existinguserredis",
+        "hash_password": "anotherpassword",
+        "email": "another@example.com"
+    }
+    response = await client.put("/api/auth/registration/", json=user_data)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "username already exists"}
 
 async def test_login_success(client: AsyncClient, db: AsyncSession):
     # Создаем пользователя для логина
