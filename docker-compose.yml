@@ -1,16 +1,20 @@
-version: '3.8'
-
 services:
   fastapi_app:
-    build: ./fastapi
+    build:
+      context: .
+      dockerfile: ./fastapi/Dockerfile
     container_name: fastapi_app
     env_file:
       - .env
     # ports:
     #   - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy # У Redis нет healthcheck, поэтому ждем просто запуска
     restart: unless-stopped
 
   kafka:
@@ -71,18 +75,14 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: ${DB_NAME}
-    # volumes:
-    #   - ./scripts/:/docker-entrypoint-initdb.d/
     # ports:
     #   - "5438:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres_user -d postgres_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 30s
       timeout: 10s
       retries: 5
     restart: unless-stopped
-    tty: true
-    stdin_open: true
   # redis:
   #   image: redis:latest
   #   container_name: redis_container
@@ -121,9 +121,9 @@ services:
   #   #   restart: unless-stopped
   #   #   tty: true
   #   #   stdin_open: true
-  redis:
+  redis: # Имя сервиса теперь 'redis', как и в depends_on
     image: redis:7.2-alpine
-    container_name: fastapi_redis
+    container_name: redis_container # Также поправим имя контейнера для единообразия
     restart: always
     # ports:
     #   - "6379:6379"
@@ -132,6 +132,11 @@ services:
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     environment:
       - TZ=Europe/Moscow
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
   nginx:
     image: nginx:latest
     container_name: nginx_proxy

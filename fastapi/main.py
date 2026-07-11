@@ -36,13 +36,12 @@ async def create_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # await create_db_and_tables() 
-    await create_db()
+    # await create_db()
     await kafka_manager.start()
-    await create_admin()
+    # await create_admin()
     yield  # В этой точке приложение начинает принимать запросы
     
     await kafka_manager.stop()
-
 
 
 logging.basicConfig(
@@ -51,6 +50,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url='/api/dock', lifespan=lifespan)
+
+@app.get('/start', status_code=status.HTTP_200_OK)
+async def starting():
+    await create_db()
+    await create_admin()
+    return {'start': 'ok'}
+
+
+
+
 
 class ConsoleLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -76,7 +85,7 @@ app.add_middleware(ConsoleLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://127.0.0.1:8000/'],
+    allow_origins=['https://127.0.0.1/'],
     allow_methods=["*"],
     allow_headers=["*"]
 

@@ -31,8 +31,8 @@ async def registration (userGet: LoginCreateInp, redis: RedisDep, service: ServD
 @router.post('/login/', response_model=TokenInfo)
 async def auth_jwt(userGet: LoginGet, rep: ServDep, response: Response):
     resp = await rep.login_user(userGet)
-    response.set_cookie(key='access', value=resp.token, httponly=True)
-    response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
+    response.set_cookie(key='access', value=resp.token, httponly=True, secure=True)
+    response.set_cookie(key='refresh', value=resp.refresh, httponly=True, secure=True)
     return TokenInfo (access_token=resp.token, refresh_token=resp.refresh)
 
 @router.get("/refresh/", response_model=TokenInfo)
@@ -44,8 +44,8 @@ async def get_refresh_token(
     if not refresh:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='отсутствует рефреш токен')
     resp = await rep.refresh_user(refresh)
-    response.set_cookie(key='access', value=resp.token, httponly=True)
-    response.set_cookie(key='refresh', value=resp.refresh, httponly=True)
+    response.set_cookie(key='access', value=resp.token, httponly=True, secure=True)
+    response.set_cookie(key='refresh', value=resp.refresh, httponly=True, secure=True)
     return TokenInfo (access_token=resp.token, refresh_token=resp.refresh)
 
 @router.get("/email_confirm/", response_model=LoginCreateResponse)
