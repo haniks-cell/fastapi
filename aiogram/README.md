@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ```env
 BOT_TOKEN=ваш_токен_от_BotFather
-KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 PROXY_URL=http://127.0.0.1:10808
 ```
 

@@ -26,6 +26,7 @@
     touch .env
     ```
 5. Отредактируйте его и запишите следующее содержимое:
+```env
 DB_HOST=postgres #localhost
 DB_PORT=5432 #5438
 DB_NAME=fastapi
@@ -38,7 +39,10 @@ REDIS_PASSWORD=WRITE_YOUR_PASSWORD_HERE
 REDIS_USER=fastapi
 REDIS_USER_PASSWORD=WRITE_YOUR_PASSWORD_HERE
 KAFKA_URL=kafka:29092 #localhost:9092
+```
 
-6. openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/nginx.key -out certs/nginx.crt -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Local/C=RU/CN=localhost"
-
-ЕСЛИ нет jwt в блоке админ, то проект крашится
+6. Для создания самоподписных сертификатов испольхуйте команду:
+```bash
+openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/nginx.key -out certs/nginx.crt -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Local/C=RU/CN=localhost"
+```
+ 
