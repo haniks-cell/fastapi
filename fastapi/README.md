@@ -45,4 +45,6 @@ KAFKA_URL=kafka:29092 #localhost:9092
 ```bash
 openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/nginx.key -out certs/nginx.crt -days 365 -subj "/C=RU/ST=Moscow/L=Moscow/O=Local/C=RU/CN=localhost"
 ```
+
+7. На linux раскомментируем строку network_mode: "host" и комментируем блок ports
  

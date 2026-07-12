@@ -3,3 +3,4 @@ certs/
 .vscode/
 .env
 venv/
+aiogram/venv/

@@ -9,14 +9,16 @@ services:
     # ports:
     #   - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      redis:
-        condition: service_healthy # У Redis нет healthcheck, поэтому ждем просто запуска
+      - postgres
+      - redis
+      - kafka
+      - clickhouse-server
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
   kafka:
     image: apache/kafka:3.7.0
     container_name: kafka
@@ -52,11 +54,11 @@ services:
       # Генерируем ID кластера, если он не задан
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka:29092 --list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:29092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -77,12 +79,28 @@ services:
       POSTGRES_DB: ${DB_NAME}
     # ports:
     #   - "5438:5432"
+    restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse_server
+    environment:
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-password}
+    # ports:
+    #   - "8123:8123" # HTTP
+    #   - "9000:9000" # Native
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
       interval: 30s
       timeout: 10s
       retries: 5
-    restart: unless-stopped
   # redis:
   #   image: redis:latest
   #   container_name: redis_container
@@ -133,12 +151,13 @@ services:
     environment:
       - TZ=Europe/Moscow
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 5
   nginx:
     image: nginx:latest
+    # network_mode: "host" # Убираем этот режим, он не работает как ожидается на Windows/macOS
     container_name: nginx_proxy
     ports:
       - "80:80"
@@ -161,3 +180,8 @@ services:
     restart: unless-stopped
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -v grep | grep aiogram_bot.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

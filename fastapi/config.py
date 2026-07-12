@@ -17,6 +17,11 @@ class Settings (BaseSettings):
     # REDIS_USER_PASSWORD:str
     KAFKA_URL:str
     APPLICATION_URL: str 
+    CLICKHOUSE_HOST: str
+    CLICKHOUSE_PORT: int
+    CLICKHOUSE_USER: str
+    CLICKHOUSE_PASSWORD: str
+    CLICKHOUSE_DB: str
 
     # @property
     def get_db_url(self):

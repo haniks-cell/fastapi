@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from typing import Annotated, Any, Awaitable, Callable, Dict
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from database import session_maker
@@ -12,6 +13,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from database import create_db
 from starlette.middleware.base import BaseHTTPMiddleware
+from clickhouse_manager import clickhouse_logger
 
 from repositories.category_rep import CategoryRepository
 from kafka_config import kafka_manager
@@ -35,12 +37,11 @@ async def create_admin():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # await create_db_and_tables() 
-    # await create_db()
+    # await clickhouse_logger.connect()
     await kafka_manager.start()
     # await create_admin()
     yield  # В этой точке приложение начинает принимать запросы
-    
+    await clickhouse_logger.close()
     await kafka_manager.stop()
 
 
@@ -55,33 +56,59 @@ app = FastAPI(docs_url='/api/dock', lifespan=lifespan)
 async def starting():
     await create_db()
     await create_admin()
+    # await clickhouse_logger.connect()
+    return {'start': 'ok'}
+
+@app.get('/startl', status_code=status.HTTP_200_OK)
+async def startingd():
+    await clickhouse_logger.connect()
     return {'start': 'ok'}
 
 
-
-
-
-class ConsoleLoggingMiddleware(BaseHTTPMiddleware):
+class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start_time = time.perf_counter()
-        
-        # Выполняем запрос
-        response = await call_next(request)
-        
-        # Вычисляем время
-        process_time = (time.perf_counter() - start_time) * 1000  # переводим в мс
-        
-        # Вывод в консоль
-        logger.info(
-            f"Метод: {request.method} | "
-            f"Путь: {request.url.path} | "
-            f"Статус: {response.status_code} | "
-            f"Время: {process_time:.2f}ms"
-        )
-        
-        return response
+        status_code = 500  # По умолчанию, если произойдет необработанная ошибка
+        try:
+            # Выполняем запрос
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        except Exception as e:
+            # В случае исключения, логируем его и снова выбрасываем,
+            # чтобы FastAPI мог его обработать.
+            logger.error(f"Request failed with exception: {e}")
+            raise e
+        finally:
+            process_time = (time.perf_counter() - start_time) * 1000
+            process_time = round(process_time, 1) # Округляем до одного знака
 
-app.add_middleware(ConsoleLoggingMiddleware)
+            if not request.url.path.startswith("/api/dock"):
+            # Вывод в консоль
+                logger.info(
+                    f"Метод: {request.method} | "
+                    f"Путь: {request.url.path} | "
+                    f"Статус: {status_code} | "
+                    f"Время: {process_time:.1f}ms"
+                )
+
+            # Пропускаем логирование для документации
+            
+                # Асинхронно отправляем лог в ClickHouse
+                await clickhouse_logger.log_request(
+                    method=request.method,
+                    path=request.url.path,
+                    client_ip=request.client.host,
+                    status_code=status_code,
+                    process_time=process_time
+                )
+
+# Добавляем middleware для обработки заголовков от прокси.
+# trusted_hosts="*" разрешает все хосты, что удобно для разработки.
+# В продакшене лучше указать IP-адрес вашего Nginx-контейнера.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+app.add_middleware(LoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
