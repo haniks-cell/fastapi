@@ -30,3 +30,7 @@ RedisDep = Annotated[aioredis.Redis, Depends(get_redis)]
 async def get_login_service(session: SesDep) -> LoginService:
     return LoginService(session)
 ServDep = Annotated[LoginService, Depends(get_login_service)]
+
+async def exist_access (access: Annotated[str | None, Cookie()] = None):
+    if not access:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='user not auth')

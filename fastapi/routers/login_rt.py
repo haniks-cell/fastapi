@@ -1,14 +1,15 @@
-import uuid
+import uuid, pyotp
 import json, asyncio
 from time import time
-from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form
+from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form, Body
+from fastapi.responses import StreamingResponse
 from typing import Annotated, Any, Awaitable, Callable, Dict, Union
-from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp, confirmEmail
+from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp, confirmEmail, TOTPCreateResponse
 from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
 from schemas.admin import AdminStatusResponse
 
-from dependses import SesDep, RedisDep, ServDep
+from dependses import SesDep, RedisDep, ServDep, exist_access
 from kafka_config import kafka_manager
 from config import settings
 
@@ -52,7 +53,6 @@ async def get_refresh_token(
 async def email_confirm(token: str, redis: RedisDep, service: ServDep):
     user = await redis.get(f'confirm_token:{token}')
     if user:
-        # return AdminStatusResponse(ok=True)
         await redis.delete(f'confirm_token:{token}')
         user=json.loads(user)
         userGet = LoginCreateInp(**user)
@@ -61,4 +61,46 @@ async def email_confirm(token: str, redis: RedisDep, service: ServDep):
                                                   lvl_access=0, email=userGet.email))
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Ссылка недействительна, истекла или уже была использована')
+
+@router.get("/get_totp/", dependencies=[Depends(exist_access)])
+async def get_totp (
+    rep: ServDep,
+    access: Annotated[str | None, Cookie()] = None
+): 
+    tid = lgrp.decode_jwt(access)
+    await rep.isExistTOTP(tid.sub) 
+    uri = await rep.get_totp(tid.sub)
+    return TOTPCreateResponse(uri=uri)
+
+@router.post("/create_qr/")
+async def create_qr (
+    rep: ServDep,
+    uri: str = Body(..., embed=True),
+):
+    qr = rep.create_qr(uri)
+    return StreamingResponse(qr, media_type="image/png")
+    
+@router.post('/check_totp/', dependencies=[Depends(exist_access)])
+async def check_totp (
+    rep: ServDep,
+    totp: int = Body(..., embed=True),
+    access: Annotated[str | None, Cookie()] = None,
+):
+    tid = lgrp.decode_jwt(access)
+    if not await rep.check_totp(totp, tid.sub):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
+    return AdminStatusResponse(ok=True)
+
+@router.post("/turn_on_totp/", dependencies=[Depends(exist_access)])
+async def turn_on_totp (
+    rep: ServDep,
+    totp: int = Body(..., embed=True),
+    access: Annotated[str | None, Cookie()] = None
+):
+    tid = lgrp.decode_jwt(access)
+    if not await rep.check_totp_redis(totp, tid.sub):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
+    await rep.add_totp(tid.sub)
+    return AdminStatusResponse(ok=True)
+
 

@@ -5,8 +5,9 @@ from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, ResponseSe
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid, asyncio
+import uuid, asyncio, pyotp, io, qrcode
 from config import settings
+from models.login import TOTPTokens
 import redis.asyncio as aioredis
 class LoginService:
     def __init__(self, db: AsyncSession):
@@ -59,6 +60,52 @@ class LoginService:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         await asyncio.gather(redis.set(f"confirm_username:{userGet.username}", token, ex=600), redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600))
     
+    async def get_totp (self, tid: int) -> str:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        key = pyotp.random_base32()
+        await redis.set(f"totp_key:{tid}", key, ex=480)
+        provisioning_uri = pyotp.totp.TOTP(key).provisioning_uri(
+            # name="", 
+            issuer_name="APP"
+        )
+        return provisioning_uri
+    
+    def create_qr(self, uri: str) -> io.BytesIO:
+        qr_image = qrcode.make(uri)
+        buffered = io.BytesIO()
+        qr_image.save(buffered, format="PNG")
+        buffered.seek(0)
+        return buffered
+    async def add_totp (self, tid: int) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        # user = await self.rep.get_by_id(tid)
+        # key = await redis.get(f"totp_key:{tid}")
+        user, key = await asyncio.gather(self.rep.get_by_id(tid), redis.get(f"totp_key:{tid}"))
+        await self.rep.add_totp(user.tid, key)
+        await redis.delete(f"totp_key:{tid}")
+        return True
+        # user.potptoken = TOTPTokens(user_id=tid,token=key)
+
+    async def check_totp_redis (self, totp: int, tid: int) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        key = await redis.get(f"totp_key:{tid}")
+        if not key:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="you need '/get_totp/' first")
+        return pyotp.totp.TOTP(key).verify(totp)
+
+    async def check_totp (self, totp: int, tid: int) -> bool:
+        user = await self.rep.get_by_id_totp(tid)
+        if not user.potptoken:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="you need '/get_totp/' first")
+        return pyotp.totp.TOTP(user.potptoken.token).verify(totp)
+    
+    async def isExistTOTP (self, tid: int) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        user_redis, user_db = await asyncio.gather(redis.get(f"totp_key:{tid}"), self.rep.get_by_id_totp(tid))
+        if user_redis or user_db.potptoken:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="TOTP already exists")
+        return True
+
 
     # async def get_all_categories(self) -> List[CategoryResponse]:
     #     categories = await self.repository.get_all()

@@ -9,8 +9,8 @@ class CategoryRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> List[Category]:
-        query = select(Category)
+    async def get_all(self, offset: int = 0, limit: int = 10) -> List[Category]:
+        query = select(Category).offset(offset).limit(limit)
         res = await self.db.execute(query)
         return res.unique().scalars().all()
     

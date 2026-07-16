@@ -8,8 +8,10 @@ class CategoryService:
     def __init__(self, db: AsyncSession):
         self.repository = CategoryRepository(db)
 
-    async def get_all_categories(self) -> List[CategoryResponse]:
-        categories = await self.repository.get_all()
+    async def get_all_categories(self, page: int) -> List[CategoryResponse]:
+        limit = 10
+        offset=(page-1)*limit
+        categories = await self.repository.get_all(offset=offset,limit=limit)
         return [CategoryResponse.model_validate(cat) for cat in categories]
 
     async def get_category_by_id(self, category_id: int) -> CategoryResponse:

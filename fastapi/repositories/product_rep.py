@@ -11,8 +11,8 @@ class ProductRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> List[Product]:
-        query = select(Product).options(joinedload(Product.category))
+    async def get_all(self, offset: int = 0, limit: int = 10) -> List[Product]:
+        query = select(Product).offset(offset).limit(limit).options(joinedload(Product.category))
         res = await self.db.execute(query)
         return res.unique().scalars().all()
     

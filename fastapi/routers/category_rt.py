@@ -26,9 +26,9 @@ catrepDep = Annotated[CategoryService, Depends(get_category_service)]
 
 
 @router.get("/", response_model=List[CategoryResponse], status_code=status.HTTP_200_OK)
-async def get_categories(service: catrepDep):
+async def get_categories(page: int, service: catrepDep):
     # service = CategoryService(session)
-    return await service.get_all_categories()
+    return await service.get_all_categories(page)
 
 @router.get('/{category_id}', response_model=CategoryResponse, status_code=status.HTTP_200_OK)
 async def get_category(category_id: int, service: catrepDep):

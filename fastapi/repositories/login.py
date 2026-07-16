@@ -1,5 +1,5 @@
 from datetime import timedelta, datetime, timezone
-from models.login import Users, RefreshTokens
+from models.login import Users, RefreshTokens, TOTPTokens
 from schemas.login import LoginCreate, TokenJwt, RefreshTokensCreate
 import jwt
 import bcrypt
@@ -58,7 +58,7 @@ class LoginRepository:
         self.db.add(db_user)
         await self.db.commit()
         await self.db.refresh(db_user)
-        return db_user
+        return db_user 
 
     async def get_by_username(self, username: str) -> Optional[Users]:
         query = select(Users).where(Users.username == username)
@@ -88,3 +88,20 @@ class LoginRepository:
         query = select(Users).where(Users.email == email)
         res = await self.db.execute(query)
         return res.unique().scalars().all()
+    
+    async def get_by_id(self, Id: int) -> Users:
+        query = select(Users).where(Users.tid == Id)
+        res = await self.db.execute(query)
+        return res.scalar() 
+    async def add_totp (self, tid: int, key: str) -> None:
+        db_refresh = TOTPTokens(user_id=tid,token=key)
+        self.db.add(db_refresh)
+        await self.db.commit()
+        await self.db.refresh(db_refresh)
+    async def get_by_id_totp(self, tid: int) -> Optional[Users]:
+        query = select(Users).where(Users.tid == tid).options(joinedload(Users.potptoken))
+        res = await self.db.execute(query)
+        return res.scalar() 
+        # return db_refresh
+    # async def add_totp (self, tid: int):
+    #     pass

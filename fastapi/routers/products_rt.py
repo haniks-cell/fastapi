@@ -20,6 +20,8 @@ from models.login import Users
 from repositories.product_rep import ProductRepository, CategoryRepository
 from schemas.product import ProductCreate, ProductResponse, ProductResponseArrEl
 from kafka_config import kafka_manager
+from services.product_serv import ProductService
+
 
 from dependses import SesDep, AccDep
 
@@ -36,6 +38,11 @@ async def get_product_repository(session: SesDep) -> ProductRepository:
 
 async def get_category_repository(session: SesDep) -> CategoryRepository:
     return CategoryRepository(session)
+
+async def get_product_service (session: SesDep) -> ProductService:
+    return ProductService(session)
+
+prodservDep = Annotated[ProductService, Depends(get_product_service)]
 
 prodrepDep = Annotated[ProductRepository, Depends(get_product_repository)]
 catrepDep = Annotated[CategoryRepository, Depends(get_category_repository)]
@@ -75,9 +82,10 @@ async def add_products(name: ProductCreate, rep: prodrepDep, lvl_access: AccDep)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='not roule')
     
 @router.get('/products/', response_model=List[ProductResponseArrEl])
-async def get_products(rep: prodrepDep):
+async def get_products(page: int, service: prodservDep):
     # rep = ProductRepository(session)
-    prodcts = await rep.get_all()
+    # prodcts = await rep.get_all()
+    prodcts = await service.get_all_products(page)
     resp = []
     for el in prodcts:
         resp.append(ProductResponseArrEl(id=el.id, name=el.name, description=el.description, price=el.price, category_id=el.category_id, image_url=el.image_url, created_at=el.created_at))

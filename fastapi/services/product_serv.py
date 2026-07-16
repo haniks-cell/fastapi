@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from repositories.product_rep import ProductRepository
 from repositories.category_rep import CategoryRepository
-from ..schemas.product import ProductResponse, ProductListResponse, ProductCreate
+from schemas.product import ProductResponse, ProductListResponse, ProductCreate
 from fastapi import HTTPException, status
 
 class ProductService:
@@ -11,10 +11,12 @@ class ProductService:
         self.product_repository = ProductRepository(db)
         self.category_repository = CategoryRepository(db)
 
-    async def get_all_products(self) -> ProductListResponse:
-        products = await self.product_repository.get_all()
+    async def get_all_products(self, page: int) -> List[ProductResponse]:
+        limit = 20
+        offset=(page-1)*limit
+        products = await self.product_repository.get_all(offset=offset, limit=limit)
         products_response = [ProductResponse.model_validate(prod) for prod in products]
-        return ProductListResponse(products=products_response, total=len(products_response))
+        return List[ProductResponse(products=products_response)]
 
     async def get_product_by_id(self, product_id: int) -> ProductResponse:
         product = await self.product_repository.get_by_id(product_id)

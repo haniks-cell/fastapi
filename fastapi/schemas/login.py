@@ -59,8 +59,11 @@ class TokenJwt(BaseModel):
     exp: int #health
     iat: int #create
 
+class TOTPCreateResponse(BaseModel):
+    uri: str
 
 class Setting(BaseSettings):
     auth_jwt: JwtAuth = JwtAuth()
+
 
 setting = Setting()

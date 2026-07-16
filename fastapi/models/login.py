@@ -15,7 +15,7 @@ class Users(Base):
     lvl_access: Mapped[int] = mapped_column(index=True)
 
     refresh: Mapped["RefreshTokens"] = relationship(back_populates="user", uselist=False)
-
+    potptoken: Mapped["TOTPTokens"] = relationship(back_populates="user", uselist=False) 
 
 
 class RefreshTokens(Base):
@@ -33,3 +33,11 @@ class RefreshTokens(Base):
     # image_url: Mapped[str] = mapped_column(Text, nullable=True)
     # created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     # # category: Mapped["Category"] = relationship(back_populates="products")
+
+class TOTPTokens(Base):
+    __tablename__='totp_tokens'
+    tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.tid"))
+    token: Mapped[str] = mapped_column(Text)
+
+    user: Mapped["Users"] = relationship(back_populates="potptoken", uselist=False)

@@ -59,10 +59,10 @@ async def starting():
     # await clickhouse_logger.connect()
     return {'start': 'ok'}
 
-@app.get('/startl', status_code=status.HTTP_200_OK)
-async def startingd():
-    await clickhouse_logger.connect()
-    return {'start': 'ok'}
+# @app.get('/startl', status_code=status.HTTP_200_OK)
+# async def startingd():
+#     await clickhouse_logger.connect()
+#     return {'start': 'ok'}
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
