@@ -22,6 +22,8 @@ class Settings (BaseSettings):
     CLICKHOUSE_USER: str
     CLICKHOUSE_PASSWORD: str
     CLICKHOUSE_DB: str
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
 
     # @property
     def get_db_url(self):

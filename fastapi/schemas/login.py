@@ -67,3 +67,30 @@ class Setting(BaseSettings):
 
 
 setting = Setting()
+
+
+class GoogleIdTokenPayload(BaseModel):
+    iss: str
+    azp: str
+    aud: str
+    sub: str
+    email: Optional[EmailStr] = None
+    email_verified: Optional[bool] = None
+    at_hash: Optional[str] = None
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    locale: Optional[str] = None
+    iat: int
+    exp: int
+ 
+    
+class GoogleOAUTHResponse(BaseModel):
+    access_token: str
+    expires_in: int
+    refresh_token: Optional[str] = None
+    scope: str
+    token_type: str
+    id_token: GoogleIdTokenPayload
+    refresh_token_expires_in: Optional[int] = None

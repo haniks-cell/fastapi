@@ -1,15 +1,15 @@
-import uuid, pyotp
+import uuid
 import json, asyncio
 from time import time
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form, Body
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 from typing import Annotated, Any, Awaitable, Callable, Dict, Union
 from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp, confirmEmail, TOTPCreateResponse
 from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
 from schemas.admin import AdminStatusResponse
 
-from dependses import SesDep, RedisDep, ServDep, exist_access
+from dependses import SesDep, RedisDep, ServDep, exist_access, SeshttpSep
 from kafka_config import kafka_manager
 from config import settings
 
@@ -102,5 +102,41 @@ async def turn_on_totp (
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
     await rep.add_totp(tid.sub)
     return AdminStatusResponse(ok=True)
+
+@router.get("/googlelink/")
+async def googlelink(rep: ServDep):
+    url = rep.create_googlelink('openid email profile https://www.googleapis.com/auth/drive')
+    return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
+
+@router.get("/google/")
+async def response_from_google(code: str, rep: ServDep, responses: Response):
+    response = await rep.callback_google(code)
+    resp=await rep.processing_google_callback(response)
+    responses.set_cookie(key='access', value=resp.token, httponly=True, secure=True)
+    responses.set_cookie(key='refresh', value=resp.refresh, httponly=True, secure=True)
+    return {'fgr': response}
+
+@router.get('/get_drive/')
+async def getDrive(sessionhttp: SeshttpSep):
+    access_google = 'sdfsfd'
+    async with sessionhttp.get('https://www.googleapis.com/drive/v3/files', headers={'Authorization': 'Bearer {access_google}'}) as response:
+        res = await response.json()
+    return res
+
+@router.get('/google_refresh/', dependencies=[Depends(exist_access)])
+async def google_refresh(rep: ServDep, access: Annotated[str | None, Cookie()] = None):
+    tid = lgrp.decode_jwt(access)
+    res=await rep.refresh_google(tid.sub)
+    return res
+
+
+@router.get('/revoke_google/', dependencies=[Depends(exist_access)])
+async def revoke_google(response: Response, rep: ServDep, access: Annotated[str | None, Cookie()] = None):
+    tid = lgrp.decode_jwt(access)
+    res=await rep.revoke_google(tid.sub)
+    response.delete_cookie(key='access')
+    response.delete_cookie(key='refresh')
+    return res
+
 
 

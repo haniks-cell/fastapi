@@ -90,3 +90,4 @@ redisdata/
 venv/
 .pytest_cache/
 decorators.py
+resp_google.txt

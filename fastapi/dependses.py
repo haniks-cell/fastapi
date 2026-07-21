@@ -6,8 +6,13 @@ from repositories.login import LoginRepositoryHelp
 from services.login_serv import LoginService
 import redis.asyncio as aioredis
 from config import settings
+from aiohttp import ClientSession
 
 lgpr = LoginRepositoryHelp()
+
+async def get_session_http():
+    async with ClientSession() as session:
+        yield session
 
 
 async def get_lvl_access(access: Annotated[str | None, Cookie()] = None) -> int:
@@ -27,6 +32,8 @@ async def get_redis():
 SesDep = Annotated[AsyncSession, Depends(get_session)]
 AccDep = Annotated[int, Depends(get_lvl_access)]
 RedisDep = Annotated[aioredis.Redis, Depends(get_redis)]
+SeshttpSep = Annotated[ClientSession, Depends(get_session_http)]
+
 async def get_login_service(session: SesDep) -> LoginService:
     return LoginService(session)
 ServDep = Annotated[LoginService, Depends(get_login_service)]

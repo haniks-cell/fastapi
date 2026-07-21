@@ -1,5 +1,5 @@
 from datetime import timedelta, datetime, timezone
-from models.login import Users, RefreshTokens, TOTPTokens
+from models.login import Users, RefreshTokens, TOTPTokens, RefreshGoogle
 from schemas.login import LoginCreate, TokenJwt, RefreshTokensCreate
 import jwt
 import bcrypt
@@ -11,6 +11,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
+from aiohttp import ClientSession
 # from decorator import complited_time
 
 class LoginRepositoryHelp:
@@ -36,12 +37,21 @@ class LoginRepositoryHelp:
             key: str = setting.auth_jwt.public.read_text(),
             alhoritm: str = setting.auth_jwt.algorithm) -> TokenJwt:
         # print('do')
-        decoded = jwt.decode(jwts, key, algorithms=[alhoritm])
+        decoded = jwt.decode(jwts, key, algorithms=[alhoritm], leeway=10)
         # return decoded
         # print('posle')
         return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], lvl_access=int(decoded['lvl_access']), exp=int(decoded['exp']), iat=int(decoded['iat']))
         # return TokenJwt(sub=1, username='fff', email=)
     
+    def decode_jwt_google(self,
+            jwts: str,
+            audience: str,
+            alhoritm: str = setting.auth_jwt.algorithm) -> TokenJwt:
+        # print('do')
+        jwks_client = jwt.PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
+        keys = jwks_client.get_signing_key_from_jwt(jwts)
+        return jwt.decode(jwts, keys.key, algorithms=[alhoritm], audience=audience, leeway=10)
+
     def hash_password(self,password:str) -> bytes:
         salt = bcrypt.gensalt()
         pwd_bytes: bytes = password.encode()
@@ -79,6 +89,16 @@ class LoginRepository:
         await self.db.refresh(db_refresh)
         return db_refresh
     
+    async def set_refresh_google(self, user_id: int, token: str, expire_s: int) -> None:
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        expire = now + timedelta(seconds=expire_s)
+        db_refresh = RefreshGoogle(user_id=user_id, token=token, expires_at=int(expire.timestamp()))
+        self.db.add(db_refresh)
+
+    async def delete_refresh_google(self, user_id:int) -> None:
+        query = delete(RefreshGoogle).where(RefreshGoogle.user_id == user_id)
+        res = await self.db.execute(query)
+
     async def is_exist (self, uuid: str) -> Optional[RefreshTokens]:
         query = select(RefreshTokens).where(RefreshTokens.uuid == uuid, RefreshTokens.expires_at > int(datetime.now(timezone.utc).timestamp())).options(joinedload(RefreshTokens.user))
         res = await self.db.execute(query)
@@ -102,6 +122,24 @@ class LoginRepository:
         query = select(Users).where(Users.tid == tid).options(joinedload(Users.potptoken))
         res = await self.db.execute(query)
         return res.scalar() 
+    async def get_by_id_google(self, tid: int) -> Optional[Users]:
+        query = select(Users).where(Users.tid == tid).options(joinedload(Users.refresh_google))
+        res = await self.db.execute(query)
+        return res.scalar() 
+    
+class LoginRepositoryHTTP ():
+    async def google_Callback(self, params):
+        async with ClientSession() as sessionhttp, sessionhttp.post('https://oauth2.googleapis.com/token', data=params) as response:
+            return await response.json()
+    
+    async def google_refresh(self, params):
+        async with ClientSession() as sessionhttp, sessionhttp.post('https://oauth2.googleapis.com/token', data=params) as response:
+            return await response.json()
+        
+    async def revoke_google (self, token:str):
+        async with ClientSession() as sessionhttp, sessionhttp.post(f'https://oauth2.googleapis.com/revoke?token={token}', headers={'Content-Type': 'application/x-www-form-urlencoded'}) as response:
+            return await response.json()
+
         # return db_refresh
     # async def add_totp (self, tid: int):
     #     pass

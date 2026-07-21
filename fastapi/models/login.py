@@ -16,6 +16,7 @@ class Users(Base):
 
     refresh: Mapped["RefreshTokens"] = relationship(back_populates="user", uselist=False)
     potptoken: Mapped["TOTPTokens"] = relationship(back_populates="user", uselist=False) 
+    refresh_google: Mapped["RefreshGoogle"] = relationship(back_populates="user", uselist=False)
 
 
 class RefreshTokens(Base):
@@ -34,10 +35,19 @@ class RefreshTokens(Base):
     # created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     # # category: Mapped["Category"] = relationship(back_populates="products")
 
-class TOTPTokens(Base):
+class TOTPTokens(Base): 
     __tablename__='totp_tokens'
     tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.tid"))
     token: Mapped[str] = mapped_column(Text)
 
     user: Mapped["Users"] = relationship(back_populates="potptoken", uselist=False)
+
+class RefreshGoogle(Base):
+    __tablename__='refresh_google'
+    tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.tid"))
+    token: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[int] = mapped_column(index=True)
+
+    user: Mapped["Users"] = relationship(back_populates="refresh_google", uselist=False)

@@ -4,4 +4,4 @@ certs/
 .env
 venv/
 aiogram/venv/
-fastapi/
+# fastapi/  <- Эта строка игнорирует весь ваш основной код приложения!

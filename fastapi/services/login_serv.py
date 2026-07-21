@@ -1,18 +1,25 @@
 from typing import List
+
+from pydantic import EmailStr
 # from dependses import RedisDep
-from repositories.login import LoginRepository, LoginRepositoryHelp
-from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, ResponseServiceLogin, RefreshTokensCreate, LoginCreateInp
+from repositories.login import LoginRepository, LoginRepositoryHelp, LoginRepositoryHTTP
+from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, ResponseServiceLogin, RefreshTokensCreate, LoginCreateInp,  GoogleIdTokenPayload, GoogleOAUTHResponse
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid, asyncio, pyotp, io, qrcode
+import uuid, asyncio, pyotp, io, qrcode, urllib.parse
 from config import settings
 from models.login import TOTPTokens
 import redis.asyncio as aioredis
+import logging
+log = logging.getLogger(__name__)
+
+
 class LoginService:
     def __init__(self, db: AsyncSession):
         self.rep = LoginRepository(db)
         self.lgrp = LoginRepositoryHelp()
+        self.rephttp = LoginRepositoryHTTP()
 
     async def create_user(self, user_data: LoginCreate) -> LoginCreateResponse:
         try:
@@ -49,16 +56,23 @@ class LoginService:
         return ResponseServiceLogin(token=access, refresh=refresh_token.uuid)
 
     async def isExistUser (self, user: LoginCreateInp) -> bool:
+        await self.isExistUsername(user.username)
+        await self.isExistEmail(user.email)
+        return True
+    
+    async def isExistEmail (self, email: EmailStr) -> bool:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        if await redis.get(f"confirm_username:{user.username}") or await self.rep.get_by_username(user.username):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
-        
-        if len(await self.rep.get_by_email(user.email)) >3:
+        if await self.rep.get_by_email(email) or await redis.get(f"confirm_email:{email}"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already exists")
         return True
+    async def isExistUsername (self, username: str) -> bool:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        if await redis.get(f"confirm_username:{username}") or await self.rep.get_by_username(username):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
+
     async def set_one_time_token(self, userGet: LoginCreateInp, token: str) -> bool:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        await asyncio.gather(redis.set(f"confirm_username:{userGet.username}", token, ex=600), redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600))
+        await asyncio.gather(redis.set(f"confirm_username:{userGet.username}", token, ex=600), redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600), redis.set(f"confirm_email:{userGet.email}", token, ex=600))
     
     async def get_totp (self, tid: int) -> str:
         redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
@@ -105,8 +119,61 @@ class LoginService:
         if user_redis or user_db.potptoken:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="TOTP already exists")
         return True
+    def create_googlelink (self, scope: str) -> str:
+        params = {
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'redirect_uri': 'https://127.0.0.1/api/auth/google',
+        'response_type': 'code',
+        'scope': scope,
+        'access_type': 'offline' 
+        }
+        return f'https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params, quote_via=urllib.parse.quote)}'
+    async def callback_google (self, code: str) -> GoogleOAUTHResponse:
+        params = {
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
+        'code': code,
+        'grant_type': 'authorization_code',
+        'redirect_uri': 'https://127.0.0.1/api/auth/google'
+    }
+        res = await self.rephttp.google_Callback(params)
+        res['id_token'] = self.lgrp.decode_jwt_google(res['id_token'], audience=settings.GOOGLE_CLIENT_ID)
+        return GoogleOAUTHResponse(**res)
 
+    async def processing_google_callback (self, response: GoogleOAUTHResponse) -> ResponseServiceLogin:
+        await self.isExistEmail(response.id_token.email)
+        await self.isExistUsername(response.id_token.sub)
+        log.warning(response.id_token.sub)
+        user=await self.rep.set_user(LoginCreate(username=response.id_token.sub, hash_password='0', email=response.id_token.email, lvl_access=6))
+        await self.rep.set_refresh_google(user.tid, response.refresh_token, response.expires_in)
 
+        jwt_token = {
+            "sub": str(user.tid),
+            "username": user.username,
+            "lvl_access": user.lvl_access
+        }
+        token = self.lgrp.encode_jwt(jwt_token)
+        refresh = uuid.uuid4().__str__()
+        await self.rep.set_refresh(RefreshTokensCreate(user_id=user.tid, uuid=refresh))
+        return ResponseServiceLogin(token=token, refresh=refresh)
+
+    async def refresh_google(self, user_id: int):
+        user=await self.rep.get_by_id_google(user_id)
+        refresh = user.refresh_google.token
+        params = {
+        'client_id': settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh
+        }
+        res = await self.rephttp.google_refresh(params)
+        return res
+
+    async def revoke_google (self, tid: int):
+        user=await self.rep.get_by_id_google(tid)
+        resp= await self.rephttp.revoke_google(user.refresh_google.token)
+        await self.rep.delete_refresh_google(tid)
+        return resp
     # async def get_all_categories(self) -> List[CategoryResponse]:
     #     categories = await self.repository.get_all()
     #     return [CategoryResponse.model_validate(cat) for cat in categories]
