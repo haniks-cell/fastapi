@@ -1,5 +1,5 @@
 from datetime import timedelta, datetime, timezone
-from models.login import Users, RefreshTokens, TOTPTokens, RefreshGoogle
+from models.login import Users, RefreshTokens, TOTPTokens, RefreshGoogle, AccessGoogle
 from schemas.login import LoginCreate, TokenJwt, RefreshTokensCreate
 import jwt
 import bcrypt
@@ -40,7 +40,7 @@ class LoginRepositoryHelp:
         decoded = jwt.decode(jwts, key, algorithms=[alhoritm], leeway=10)
         # return decoded
         # print('posle')
-        return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], lvl_access=int(decoded['lvl_access']), exp=int(decoded['exp']), iat=int(decoded['iat']))
+        return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], lvl_access=int(decoded['lvl_access']), access_google_id =int(decoded['access_google_id']), exp=int(decoded['exp']), iat=int(decoded['iat']))
         # return TokenJwt(sub=1, username='fff', email=)
     
     def decode_jwt_google(self,
@@ -75,6 +75,11 @@ class LoginRepository:
         res = await self.db.execute(query)
         return res.scalar()
     
+    async def get_by_username_google(self, username: str) -> Optional[Users]:
+        query = select(Users).where(Users.username == username).options(joinedload(Users.refresh_google))
+        res = await self.db.execute(query)
+        return res.scalar()
+    
     async def delete_refresh(self, user_id:str) -> None:
         query = delete(RefreshTokens).where(RefreshTokens.user_id == user_id)
         res = await self.db.execute(query)
@@ -94,7 +99,9 @@ class LoginRepository:
         expire = now + timedelta(seconds=expire_s)
         db_refresh = RefreshGoogle(user_id=user_id, token=token, expires_at=int(expire.timestamp()))
         self.db.add(db_refresh)
-
+        # await self.db.commit()
+        # await self.db.refresh(db_refresh)
+        # return db_refresh
     async def delete_refresh_google(self, user_id:int) -> None:
         query = delete(RefreshGoogle).where(RefreshGoogle.user_id == user_id)
         res = await self.db.execute(query)
@@ -126,7 +133,30 @@ class LoginRepository:
         query = select(Users).where(Users.tid == tid).options(joinedload(Users.refresh_google))
         res = await self.db.execute(query)
         return res.scalar() 
+    async def set_access_google(self, user_id: int, token: str, expire_s: int) -> Optional[AccessGoogle]:
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        expire = now + timedelta(seconds=expire_s)
+        db_refresh = AccessGoogle(user_id=user_id, token=token, expires_at=int(expire.timestamp()))
+        self.db.add(db_refresh)
+        await self.db.commit()
+        await self.db.refresh(db_refresh)
+        return db_refresh
+    async def get_by_id_google_access(self, tid: int) -> Optional[AccessGoogle]:
+        query = select(AccessGoogle).where(AccessGoogle.tid == tid)
+        res = await self.db.execute(query)
+        return res.scalar()  
     
+    async def update_access_google(self, user_id: int, new_token: str, expire_s: int) -> Optional[AccessGoogle]:
+        """Обновляет access_token для Google по tid записи в таблице AccessGoogle."""
+        record_to_update = await self.db.get(AccessGoogle, user_id)
+        if record_to_update:
+            now = datetime.now(timezone.utc).replace(microsecond=0)
+            expire = now + timedelta(seconds=expire_s)
+            record_to_update.token = new_token
+            record_to_update.expires_at = int(expire.timestamp())
+            await self.db.commit()
+            await self.db.refresh(record_to_update)
+        return record_to_update
 class LoginRepositoryHTTP ():
     async def google_Callback(self, params):
         async with ClientSession() as sessionhttp, sessionhttp.post('https://oauth2.googleapis.com/token', data=params) as response:
@@ -140,6 +170,9 @@ class LoginRepositoryHTTP ():
         async with ClientSession() as sessionhttp, sessionhttp.post(f'https://oauth2.googleapis.com/revoke?token={token}', headers={'Content-Type': 'application/x-www-form-urlencoded'}) as response:
             return await response.json()
 
+    async def get_google_file (self, access_token: str):
+        async with ClientSession() as sessionhttp, sessionhttp.get('https://www.googleapis.com/drive/v3/files', headers={'Authorization': f'Bearer {access_token}'}) as response:
+            return await response.json()
         # return db_refresh
     # async def add_totp (self, tid: int):
     #     pass

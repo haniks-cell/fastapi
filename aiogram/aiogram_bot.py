@@ -21,13 +21,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Config
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7831581649:AAG_zDN4211n6UR3GHC0sMZAN-Du7Pi6erQ")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7831581649:AAH5qcBVNtE12i85oDAZTPSBLLiydj38C20")
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "KAFKA_BOOTSTRAP_SERVERS", "kafka:29092"
 ).split(",")
 PROXY_URL = os.getenv("PROXY_URL", "http://127.0.0.1:10808")
-session = AiohttpSession(proxy="http://127.0.0.1:10808")
-bot = Bot(token="7831581649:AAG_zDN4211n6UR3GHC0sMZAN-Du7Pi6erQ")
+session = AiohttpSession(proxy=PROXY_URL)
+bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher()
 # Global bot instance for Kafka consumer
 # _bot: Bot = None

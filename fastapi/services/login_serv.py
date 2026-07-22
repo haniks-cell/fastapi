@@ -12,6 +12,7 @@ from config import settings
 from models.login import TOTPTokens
 import redis.asyncio as aioredis
 import logging
+from kafka_config import kafka_manager
 log = logging.getLogger(__name__)
 
 
@@ -35,7 +36,8 @@ class LoginService:
         jwt_token = {
             "sub": str(user.tid),
             "username": user.username,
-            "lvl_access": user.lvl_access
+            "lvl_access": user.lvl_access,
+            "access_google_id": 0
         }
         token = self.lgrp.encode_jwt(jwt_token)
         refresh = uuid.uuid4().__str__()
@@ -50,7 +52,8 @@ class LoginService:
         jwt_token = {
             "sub": str(token.user_id),
             "username": token.user.username,
-            "lvl_access": token.user.lvl_access
+            "lvl_access": token.user.lvl_access,
+            "access_google_id": 0
         }
         access = self.lgrp.encode_jwt(jwt_token)
         return ResponseServiceLogin(token=access, refresh=refresh_token.uuid)
@@ -141,16 +144,34 @@ class LoginService:
         return GoogleOAUTHResponse(**res)
 
     async def processing_google_callback (self, response: GoogleOAUTHResponse) -> ResponseServiceLogin:
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        # if await self.rep.get_by_email(response.id_token.email) or await redis.get(f"confirm_email:{response.id_token.email}"):
+        #     pass
+        # await self.isExistUsername(response.id_token.sub)
+        user = await self.rep.get_by_username(response.id_token.sub)
+        if user:
+            access=await self.rep.set_access_google(user.tid, response.access_token, response.expires_in)
+            jwt_token = {
+                "sub": str(user.tid),
+                "username": user.username,
+                "lvl_access": user.lvl_access,
+                "access_google_id": access.tid
+            }
+            token = self.lgrp.encode_jwt(jwt_token)
+            refresh = uuid.uuid4().__str__()
+            await self.rep.set_refresh(RefreshTokensCreate(user_id=user.tid, uuid=refresh))
+            return ResponseServiceLogin(token=token, refresh=refresh)
+
         await self.isExistEmail(response.id_token.email)
-        await self.isExistUsername(response.id_token.sub)
         log.warning(response.id_token.sub)
         user=await self.rep.set_user(LoginCreate(username=response.id_token.sub, hash_password='0', email=response.id_token.email, lvl_access=6))
         await self.rep.set_refresh_google(user.tid, response.refresh_token, response.expires_in)
-
+        access=await self.rep.set_access_google(user.tid, response.access_token, response.expires_in)
         jwt_token = {
             "sub": str(user.tid),
             "username": user.username,
-            "lvl_access": user.lvl_access
+            "lvl_access": user.lvl_access,
+            "access_google_id": access.tid
         }
         token = self.lgrp.encode_jwt(jwt_token)
         refresh = uuid.uuid4().__str__()
@@ -167,6 +188,7 @@ class LoginService:
         'refresh_token': refresh
         }
         res = await self.rephttp.google_refresh(params)
+        await self.rep.update_access_google(user.refresh_google.user_id, res['access_token'], res['expires_in'])
         return res
 
     async def revoke_google (self, tid: int):
@@ -174,6 +196,10 @@ class LoginService:
         resp= await self.rephttp.revoke_google(user.refresh_google.token)
         await self.rep.delete_refresh_google(tid)
         return resp
+    
+    async def get_google_files(self, id_access: int):
+        token=await self.rep.get_by_id_google_access(id_access)
+        return await self.rephttp.get_google_file(token.token)
     # async def get_all_categories(self) -> List[CategoryResponse]:
     #     categories = await self.repository.get_all()
     #     return [CategoryResponse.model_validate(cat) for cat in categories]

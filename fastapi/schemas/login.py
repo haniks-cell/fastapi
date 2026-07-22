@@ -56,6 +56,7 @@ class TokenJwt(BaseModel):
     sub: int
     username: str
     lvl_access: int = 0
+    access_google_id: int = 0
     exp: int #health
     iat: int #create
 

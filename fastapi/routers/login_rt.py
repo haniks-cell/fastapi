@@ -110,17 +110,18 @@ async def googlelink(rep: ServDep):
 
 @router.get("/google/")
 async def response_from_google(code: str, rep: ServDep, responses: Response):
-    response = await rep.callback_google(code)
+    response = await rep.callback_google(code) 
     resp=await rep.processing_google_callback(response)
     responses.set_cookie(key='access', value=resp.token, httponly=True, secure=True)
     responses.set_cookie(key='refresh', value=resp.refresh, httponly=True, secure=True)
     return {'fgr': response}
 
-@router.get('/get_drive/')
-async def getDrive(sessionhttp: SeshttpSep):
-    access_google = 'sdfsfd'
-    async with sessionhttp.get('https://www.googleapis.com/drive/v3/files', headers={'Authorization': 'Bearer {access_google}'}) as response:
-        res = await response.json()
+@router.get('/get_drive/', dependencies=[Depends(exist_access)])
+async def getDrive(rep: ServDep, access: Annotated[str | None, Cookie()] = None):
+    tid = lgrp.decode_jwt(access)
+    res=await rep.get_google_files(tid.access_google_id)
+    # async with sessionhttp.get('https://www.googleapis.com/drive/v3/files', headers={'Authorization': 'Bearer {access_google}'}) as response:
+    #     res = await response.json()
     return res
 
 @router.get('/google_refresh/', dependencies=[Depends(exist_access)])
