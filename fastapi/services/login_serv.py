@@ -17,8 +17,9 @@ log = logging.getLogger(__name__)
 
 
 class LoginService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, redis: aioredis.Redis):
         self.rep = LoginRepository(db)
+        self.redis = redis
         self.lgrp = LoginRepositoryHelp()
         self.rephttp = LoginRepositoryHTTP()
 
@@ -64,23 +65,23 @@ class LoginService:
         return True
     
     async def isExistEmail (self, email: EmailStr) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        if await self.rep.get_by_email(email) or await redis.get(f"confirm_email:{email}"):
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        if await self.rep.get_by_email(email) or await self.redis.get(f"confirm_email:{email}"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already exists")
         return True
     async def isExistUsername (self, username: str) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        if await redis.get(f"confirm_username:{username}") or await self.rep.get_by_username(username):
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        if await self.redis.get(f"confirm_username:{username}") or await self.rep.get_by_username(username):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already exists")
 
     async def set_one_time_token(self, userGet: LoginCreateInp, token: str) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        await asyncio.gather(redis.set(f"confirm_username:{userGet.username}", token, ex=600), redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600), redis.set(f"confirm_email:{userGet.email}", token, ex=600))
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        await asyncio.gather(self.redis.set(f"confirm_username:{userGet.username}", token, ex=600), self.redis.set(f"confirm_token:{token}", userGet.model_dump_json(), ex=600), self.redis.set(f"confirm_email:{userGet.email}", token, ex=600))
     
     async def get_totp (self, tid: int) -> str:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         key = pyotp.random_base32()
-        await redis.set(f"totp_key:{tid}", key, ex=480)
+        await self.redis.set(f"totp_key:{tid}", key, ex=480)
         provisioning_uri = pyotp.totp.TOTP(key).provisioning_uri(
             # name="", 
             issuer_name="APP"
@@ -94,18 +95,18 @@ class LoginService:
         buffered.seek(0)
         return buffered
     async def add_totp (self, tid: int) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         # user = await self.rep.get_by_id(tid)
         # key = await redis.get(f"totp_key:{tid}")
-        user, key = await asyncio.gather(self.rep.get_by_id(tid), redis.get(f"totp_key:{tid}"))
+        user, key = await asyncio.gather(self.rep.get_by_id(tid), self.redis.get(f"totp_key:{tid}"))
         await self.rep.add_totp(user.tid, key)
-        await redis.delete(f"totp_key:{tid}")
+        await self.redis.delete(f"totp_key:{tid}")
         return True
         # user.potptoken = TOTPTokens(user_id=tid,token=key)
 
     async def check_totp_redis (self, totp: int, tid: int) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        key = await redis.get(f"totp_key:{tid}")
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        key = await self.redis.get(f"totp_key:{tid}")
         if not key:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="you need '/get_totp/' first")
         return pyotp.totp.TOTP(key).verify(totp)
@@ -117,8 +118,8 @@ class LoginService:
         return pyotp.totp.TOTP(user.potptoken.token).verify(totp)
     
     async def isExistTOTP (self, tid: int) -> bool:
-        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        user_redis, user_db = await asyncio.gather(redis.get(f"totp_key:{tid}"), self.rep.get_by_id_totp(tid))
+        # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        user_redis, user_db = await asyncio.gather(self.redis.get(f"totp_key:{tid}"), self.rep.get_by_id_totp(tid))
         if user_redis or user_db.potptoken:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="TOTP already exists")
         return True
@@ -145,7 +146,7 @@ class LoginService:
 
     async def processing_google_callback (self, response: GoogleOAUTHResponse) -> ResponseServiceLogin:
         # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
-        # if await self.rep.get_by_email(response.id_token.email) or await redis.get(f"confirm_email:{response.id_token.email}"):
+        # if await self.rep.get_by_email(response.id_token.email) or await self.redis.get(f"confirm_email:{response.id_token.email}"):
         #     pass
         # await self.isExistUsername(response.id_token.sub)
         user = await self.rep.get_by_username(response.id_token.sub)

@@ -34,8 +34,8 @@ AccDep = Annotated[int, Depends(get_lvl_access)]
 RedisDep = Annotated[aioredis.Redis, Depends(get_redis)]
 SeshttpSep = Annotated[ClientSession, Depends(get_session_http)]
 
-async def get_login_service(session: SesDep) -> LoginService:
-    return LoginService(session)
+async def get_login_service(session: SesDep, redis: RedisDep) -> LoginService:
+    return LoginService(session, redis)
 ServDep = Annotated[LoginService, Depends(get_login_service)]
 
 async def exist_access (access: Annotated[str | None, Cookie()] = None):

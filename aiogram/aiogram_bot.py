@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Config
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7831581649:AAH5qcBVNtE12i85oDAZTPSBLLiydj38C20")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "token")
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "KAFKA_BOOTSTRAP_SERVERS", "kafka:29092"
 ).split(",")
@@ -81,34 +81,37 @@ async def consume_kafka(bot: Bot) -> None:
         logger.info("Kafka consumer stopped")
 
 
-async def on_startup(bot: Bot) -> None:
+async def on_startup(bot: Bot) -> asyncio.Task:
     """Startup Kafka consumer."""
-    asyncio.create_task(consume_kafka(bot))
-    logger.info("Kafka consumer started")
+    task = asyncio.create_task(consume_kafka(bot))
+    logger.info("Kafka consumer task created")
+    return task
 
 
-async def on_shutdown(bot: Bot) -> None:
-    """Shutdown bot."""
+async def on_shutdown(bot: Bot, kafka_task: asyncio.Task) -> None:
+    """Gracefully shutdown bot and background tasks."""
+    logger.info("Shutting down...")
+    if kafka_task:
+        kafka_task.cancel()
+        try:
+            await kafka_task
+        except asyncio.CancelledError:
+            logger.info("Kafka consumer task cancelled.")
     await bot.session.close()
     logger.info("Bot shutdown complete")
 
 
 async def run_bot() -> None:
     """Run the bot with polling."""
-    
-    # _bot = bot
-
     dp.message(cmd_start)(Command("start"))
-
-    await on_startup(bot)
-
+    kafka_consumer_task = await on_startup(bot)
     logger.info("Bot is starting...")
     await bot.delete_webhook(drop_pending_updates=True)
 
     try:
         await dp.start_polling(bot)
     finally:
-        await on_shutdown(bot)
+        await on_shutdown(bot, kafka_consumer_task)
 
 
 def run() -> None:
