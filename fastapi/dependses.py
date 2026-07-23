@@ -41,3 +41,11 @@ ServDep = Annotated[LoginService, Depends(get_login_service)]
 async def exist_access (access: Annotated[str | None, Cookie()] = None):
     if not access:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='user not auth')
+    
+
+async def exist_access_google (access: Annotated[str | None, Cookie()] = None):
+    if not access:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='user not auth')
+    jwt = lgpr.decode_jwt(access)
+    if jwt.access_google_id == 0:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='You need to auth with google')

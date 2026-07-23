@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime, timezone
+import json
 from models.login import Users, RefreshTokens, TOTPTokens, RefreshGoogle, AccessGoogle
-from schemas.login import LoginCreate, TokenJwt, RefreshTokensCreate
+from schemas.login import LoginCreate, TokenJwt, RefreshTokensCreate, AccessGoogleCreate
 import jwt
 import bcrypt
 from schemas.login import setting
@@ -13,6 +14,9 @@ from sqlalchemy import select, delete
 
 from aiohttp import ClientSession
 # from decorator import complited_time
+from config import settings
+# from models.login import TOTPTokens
+import redis.asyncio as aioredis
 
 class LoginRepositoryHelp:
     def encode_jwt(
@@ -29,15 +33,17 @@ class LoginRepositoryHelp:
             expire = now + expire_timedelta
         else:
             expire = now + timedelta(minutes=expire_min)
-        to_enc.update(exp=expire, iat=now)
-        encoded = jwt.encode(to_enc, key, algorithm=alhoritm)
+        to_enc.update(exp=expire, iat=now, iss=settings.APPLICATION_URL)
+        headers = {}
+        headers["kid"] = "87e9442ba1bdbc2697e060356960e94e865454977da9e9ee57e053bd98e479d5"
+        encoded = jwt.encode(to_enc, key, algorithm=alhoritm, headers=headers) 
         return encoded
     def decode_jwt(self,
             jwts: str,
             key: str = setting.auth_jwt.public.read_text(),
             alhoritm: str = setting.auth_jwt.algorithm) -> TokenJwt:
         # print('do')
-        decoded = jwt.decode(jwts, key, algorithms=[alhoritm], leeway=10)
+        decoded = jwt.decode(jwts, key, algorithms=[alhoritm], issuer=settings.APPLICATION_URL, leeway=10)
         # return decoded
         # print('posle')
         return TokenJwt(sub=int(decoded['sub']), username=decoded['username'], lvl_access=int(decoded['lvl_access']), access_google_id =int(decoded['access_google_id']), exp=int(decoded['exp']), iat=int(decoded['iat']))
@@ -133,29 +139,37 @@ class LoginRepository:
         query = select(Users).where(Users.tid == tid).options(joinedload(Users.refresh_google))
         res = await self.db.execute(query)
         return res.scalar() 
-    async def set_access_google(self, user_id: int, token: str, expire_s: int) -> Optional[AccessGoogle]:
+    async def set_access_google(self, user_id: int, token: str, expire_s: int) -> Optional[AccessGoogleCreate]:
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         now = datetime.now(timezone.utc).replace(microsecond=0)
         expire = now + timedelta(seconds=expire_s)
-        db_refresh = AccessGoogle(user_id=user_id, token=token, expires_at=int(expire.timestamp()))
-        self.db.add(db_refresh)
-        await self.db.commit()
-        await self.db.refresh(db_refresh)
+        db_refresh = AccessGoogleCreate(user_id=user_id, token=token, expires_at=int(expire.timestamp())) 
+        await redis.set(f'google_access:{db_refresh.user_id}', db_refresh.model_dump_json(), ex=expire_s)
         return db_refresh
-    async def get_by_id_google_access(self, tid: int) -> Optional[AccessGoogle]:
-        query = select(AccessGoogle).where(AccessGoogle.tid == tid)
-        res = await self.db.execute(query)
-        return res.scalar()  
-    
-    async def update_access_google(self, user_id: int, new_token: str, expire_s: int) -> Optional[AccessGoogle]:
+        # self.db.add(db_refresh)
+        # await self.db.commit()
+        # await self.db.refresh(db_refresh)
+        # return db_refresh
+    async def get_by_id_google_access(self, tid: int) -> Optional[AccessGoogleCreate]:
+        # query = select(AccessGoogle).where(AccessGoogle.tid == tid)
+        # res = await self.db.execute(query)
+        # return res.scalar()  
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        return AccessGoogleCreate.model_validate_json(await redis.get(f'google_access:{tid}'))
+    async def update_access_google(self, user_id: int, new_token: str, expire_s: int) -> Optional[AccessGoogleCreate]:
         """Обновляет access_token для Google по tid записи в таблице AccessGoogle."""
-        record_to_update = await self.db.get(AccessGoogle, user_id)
-        if record_to_update:
-            now = datetime.now(timezone.utc).replace(microsecond=0)
-            expire = now + timedelta(seconds=expire_s)
-            record_to_update.token = new_token
-            record_to_update.expires_at = int(expire.timestamp())
-            await self.db.commit()
-            await self.db.refresh(record_to_update)
+        redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        # record_to_update = await self.db.get(AccessGoogle, user_id)
+        record_to_update = await redis.get(f'google_access:{user_id}')
+        record_to_update = AccessGoogleCreate.model_validate_json(record_to_update)
+        # if record_to_update:
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        expire = now + timedelta(seconds=expire_s)
+        record_to_update.token = new_token
+        record_to_update.expires_at = int(expire.timestamp())
+        await redis.set(f'google_access:{user_id}', record_to_update.model_dump_json(), ex=expire_s)
+        # await self.db.commit()
+        # await self.db.refresh(record_to_update)
         return record_to_update
 class LoginRepositoryHTTP ():
     async def google_Callback(self, params):

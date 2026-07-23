@@ -95,3 +95,9 @@ class GoogleOAUTHResponse(BaseModel):
     token_type: str
     id_token: GoogleIdTokenPayload
     refresh_token_expires_in: Optional[int] = None
+
+
+class AccessGoogleCreate(BaseModel):
+    user_id: int
+    token: str
+    expires_at: int

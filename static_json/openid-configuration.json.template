@@ -1,0 +1,5 @@
+{
+  "issuer": "${APPLICATION_URL}",
+  "authorization_endpoint": "${APPLICATION_URL}api/auth/login/",
+  "jwks_uri": "${APPLICATION_URL}jwks"
+}

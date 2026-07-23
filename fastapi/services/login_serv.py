@@ -63,7 +63,9 @@ class LoginService:
         await self.isExistUsername(user.username)
         await self.isExistEmail(user.email)
         return True
-    
+    def userNotOnlyNumbers (self, username: str) -> None:
+        if username.isdigit():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Username cannot be only numbers")
     async def isExistEmail (self, email: EmailStr) -> bool:
         # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         if await self.rep.get_by_email(email) or await self.redis.get(f"confirm_email:{email}"):
@@ -104,7 +106,7 @@ class LoginService:
         return True
         # user.potptoken = TOTPTokens(user_id=tid,token=key)
 
-    async def check_totp_redis (self, totp: int, tid: int) -> bool:
+    async def check_totp_redis (self, totp: str, tid: int) -> bool:
         # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
         key = await self.redis.get(f"totp_key:{tid}")
         if not key:
@@ -156,7 +158,7 @@ class LoginService:
                 "sub": str(user.tid),
                 "username": user.username,
                 "lvl_access": user.lvl_access,
-                "access_google_id": access.tid
+                "access_google_id": access.user_id
             }
             token = self.lgrp.encode_jwt(jwt_token)
             refresh = uuid.uuid4().__str__()
@@ -168,11 +170,12 @@ class LoginService:
         user=await self.rep.set_user(LoginCreate(username=response.id_token.sub, hash_password='0', email=response.id_token.email, lvl_access=6))
         await self.rep.set_refresh_google(user.tid, response.refresh_token, response.expires_in)
         access=await self.rep.set_access_google(user.tid, response.access_token, response.expires_in)
+        # await self.redis.set(f'google_access:{access.user_id}', access.model_dump_json(), ex=response.expires_in)
         jwt_token = {
             "sub": str(user.tid),
             "username": user.username,
             "lvl_access": user.lvl_access,
-            "access_google_id": access.tid
+            "access_google_id": access.user_id
         }
         token = self.lgrp.encode_jwt(jwt_token)
         refresh = uuid.uuid4().__str__()
@@ -189,6 +192,7 @@ class LoginService:
         'refresh_token': refresh
         }
         res = await self.rephttp.google_refresh(params)
+        log.warning(res)
         await self.rep.update_access_google(user.refresh_google.user_id, res['access_token'], res['expires_in'])
         return res
 

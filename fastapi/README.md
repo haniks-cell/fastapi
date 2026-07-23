@@ -20,6 +20,25 @@
     # Извлечение публичного ключа из приватного
     openssl rsa -in private.pem -pubout -out public.pem
     ```
+    ```bash
+    npm install -g pem-jwk
+
+    pem-jwk public.pem > jwk.json
+    ```
+
+    Затем напиши значение ключа n в 
+    ```bash
+
+    echo -n "ваша_строка_здесь" | sha256sum
+
+
+    ```
+
+    Затем вставьте в файл {
+  "keys": [
+    {"kty":"RSA","kid":"...", "n":"...","e":"AQAB"}
+  ]
+}, куда подставьте ваши начения
 
 4. Создайте файл окружения `.env`:
     ```bash
@@ -47,4 +66,3 @@ openssl req -x509 -nodes -newkey rsa:2048 -keyout certs/nginx.key -out certs/ngi
 ```
 
 7. На linux раскомментируем строку network_mode: "host" и комментируем блок ports
- 

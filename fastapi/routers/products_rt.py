@@ -63,7 +63,7 @@ catrepDep = Annotated[CategoryRepository, Depends(get_category_repository)]
 
 # KafkaDep = Annotated[AIOKafkaProducer, Depends(get_kafka)]
 
-@router.put('/add_cat/')
+@router.put('/add_cat/', status_code=status.HTTP_201_CREATED)
 async def add_categories(name: str, rep: catrepDep, lvl_access: AccDep):
     if lvl_access >= 3:
         # rep = CategoryRepository(session)
@@ -72,7 +72,7 @@ async def add_categories(name: str, rep: catrepDep, lvl_access: AccDep):
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='not roule')
 
-@router.put('/add_prod/')
+@router.put('/add_prod/', status_code=status.HTTP_201_CREATED)
 async def add_products(name: ProductCreate, rep: prodrepDep, lvl_access: AccDep):
     if lvl_access >= 3:
         # rep = ProductRepository(session)
