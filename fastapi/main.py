@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, status, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from typing import Annotated, Any, Awaitable, Callable, Dict
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from database import session_maker
 from sqlalchemy.ext.asyncio import AsyncSession
+from schemas.main import AddErrors
 from routers.category_rt import router as cat_rt
 from routers.login_rt import router as lg_rt
 from routers.products_rt import router as pr_rt
@@ -18,6 +20,8 @@ from clickhouse_manager import clickhouse_logger
 from repositories.category_rep import CategoryRepository
 from kafka_config import kafka_manager
 
+from dependses import SesDep
+
 import logging
 import time
 from fastapi import Request
@@ -25,9 +29,17 @@ from dependses import SesDep, get_session
 from schemas.login import LoginCreate
 from repositories.login import LoginRepository, LoginRepositoryHelp
 
+from services.main_serv import LoginService
+
+
 from database import session_maker
 
 lgrp = LoginRepositoryHelp()
+
+async def get_main_service(session: SesDep) -> LoginService:
+    return LoginService(session)
+
+mainservDep = Annotated[LoginService, Depends(get_main_service)]
 
 async def create_admin():
     async with session_maker() as session:
@@ -51,6 +63,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url='/api/dock', lifespan=lifespan)
+
+@app.exception_handler(Exception)
+async def internal_server_error_handler(request: Request, exc: Exception):
+    """
+    Глобальный обработчик для всех необработанных исключений.
+    Логирует ошибку и возвращает стандартизированный JSON-ответ
+    со статусом 500.
+    """
+    # В обработчиках исключений DI не работает, поэтому создаем сервис вручную
+    try:
+        async with session_maker() as session:
+            service = LoginService(session)
+            await service.addErrors(AddErrors(error_text=str(exc), endpont=request.url.path, method=request.method))
+    except Exception as db_error:
+        logger.error(f"Не удалось записать ошибку в БД: {db_error}", exc_info=True)
+
+    logger.error(f"Unhandled exception for request {request.method} {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Произошла внутренняя ошибка сервера. Пожалуйста, свяжитесь с администратором."},
+    )
 
 @app.get('/start', status_code=status.HTTP_200_OK)
 async def starting():
