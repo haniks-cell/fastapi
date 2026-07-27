@@ -11,7 +11,7 @@ class Users(Base):
     tid: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     username: Mapped[str] = mapped_column(String(40), nullable=False, index=True, unique=True)
     hash_password: Mapped[str] = mapped_column(Text)
-    email: Mapped[str] = mapped_column(String(40))
+    email: Mapped[Optional[str]] = mapped_column(String(40))
     lvl_access: Mapped[int] = mapped_column(index=True)
 
     refresh: Mapped["RefreshTokens"] = relationship(back_populates="user", uselist=False)

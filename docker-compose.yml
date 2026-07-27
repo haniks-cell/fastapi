@@ -15,7 +15,7 @@ services:
       - clickhouse-server
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -192,6 +192,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
+  email_sender:
+    build: ./email_sender
+    container_name: email_sender
+    env_file:
+      - .env # Глобальные переменные (KAFKA_BOOTSTRAP_SERVERS, APPLICATION_URL)
+      - ./email_sender/.env # Переменные для почты (GMAIL_LOGIN, GMAIL_PASSWORD и т.д.)
+    depends_on:
+      - kafka
+    restart: unless-stopped
+    # environment:
+    #   # Переопределяем адрес Kafka для внутренней сети Docker
+    #   - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
 
 #   grafana:
 #     image: grafana/grafana-oss:latest

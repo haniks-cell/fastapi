@@ -22,7 +22,12 @@ class LoginCreateInp(BaseModel):
     username: str
     hash_password: str
     email: Optional[EmailStr] = None
+    # tg_id: Optional[int] = None
     # active: bool = True
+
+class LoginCreateInpAddTG(LoginCreateInp):
+    tg_id: Optional[int] = None
+
 
 class LoginCreate (LoginCreateInp):
     lvl_access: int = 0

@@ -92,6 +92,10 @@ async def starting():
     # await clickhouse_logger.connect()
     return {'start': 'ok'}
 
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health_check():
+    return {"status": "ok"}
+
 # @app.get('/startl', status_code=status.HTTP_200_OK)
 # async def startingd():
 #     await clickhouse_logger.connect()

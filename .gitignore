@@ -4,5 +4,6 @@ certs/
 .env
 venv/
 aiogram/venv/
+email_sender/.env/
 todos.txt
 # fastapi/  <- Эта строка игнорирует весь ваш основной код приложения!

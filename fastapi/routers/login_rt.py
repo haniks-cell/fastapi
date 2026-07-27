@@ -1,10 +1,10 @@
-import uuid
+import uuid, logging
 import json, asyncio
 from time import time
 from fastapi import APIRouter, Depends, status, HTTPException,  Header, Response, Cookie, Form, Body
 from fastapi.responses import StreamingResponse, RedirectResponse
 from typing import Annotated, Any, Awaitable, Callable, Dict, Union
-from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp, confirmEmail, TOTPCreateResponse
+from schemas.login import LoginCreate, LoginCreateResponse, LoginGet, TokenInfo, Login, RefreshTokensCreate, LoginCreateInp, confirmEmail, TOTPCreateResponse, LoginCreateInpAddTG
 from repositories.login import LoginRepository, LoginRepositoryHelp
 from services.login_serv import LoginService
 from schemas.admin import AdminStatusResponse
@@ -19,15 +19,24 @@ router = APIRouter(
     tags=['autenthication']
 )
 
+logger = logging.getLogger(__name__)
+
 lgrp = LoginRepositoryHelp()
  
 @router.put('/registration/', response_model=LoginCreateResponse, status_code=status.HTTP_202_ACCEPTED) #
-async def registration (userGet: LoginCreateInp, service: ServDep): 
+async def registration (userGet: LoginCreateInpAddTG, service: ServDep): 
     service.userNotOnlyNumbers(userGet.username)
     await service.isExistUser(userGet)
     token = str(uuid.uuid4())
-    data = {'email': 5125774016, 'link': f'{settings.APPLICATION_URL}api/auth/email_confirm/?token={token}'}
-    await asyncio.gather(service.set_one_time_token(userGet, token), kafka_manager.send_message("magiclink", value=json.dumps(data)))
+    if userGet.email:
+    # data = {'email': 5125774016, 'link': f'{settings.APPLICATION_URL}api/auth/email_confirm/?token={token}'}
+        data = {'email': userGet.email, 'link': f'{settings.APPLICATION_URL}api/auth/email_confirm/?token={token}'}
+        await asyncio.gather(service.set_one_time_token(LoginCreateInp.model_validate(userGet), token), kafka_manager.send_message("magiclinkEmail", value=json.dumps(data)))
+    elif userGet.tg_id:
+        data = {'tg_id': userGet.tg_id, 'link': f'{settings.APPLICATION_URL}api/auth/email_confirm/?token={token}'}
+        await asyncio.gather(service.set_one_time_token(LoginCreateInp.model_validate(userGet), token), kafka_manager.send_message("magiclink", value=json.dumps(data)))
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='You need add email or tg_id')
     return LoginCreateResponse(ok=True)
 
 @router.post('/login/', response_model=TokenInfo)

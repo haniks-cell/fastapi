@@ -61,6 +61,8 @@ class LoginService:
 
     async def isExistUser (self, user: LoginCreateInp) -> bool:
         await self.isExistUsername(user.username)
+        if not user.email:
+            return True
         await self.isExistEmail(user.email)
         return True
     def userNotOnlyNumbers (self, username: str) -> None:
@@ -68,6 +70,8 @@ class LoginService:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Username cannot be only numbers")
     async def isExistEmail (self, email: EmailStr) -> bool:
         # redis = aioredis.from_url(settings.get_redis_url(), decode_responses=True)
+        if not email:
+            return True
         if await self.rep.get_by_email(email) or await self.redis.get(f"confirm_email:{email}"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already exists")
         return True

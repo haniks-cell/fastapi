@@ -6,33 +6,32 @@ Listens to Kafka topic 'magiclink' and forwards links to users by TG ID.
 import asyncio
 import json
 import logging
-import os
+from typing import Any
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import Message
 from aiogram.filters import Command
-from aiokafka import AIOKafkaConsumer
-from dotenv import load_dotenv
+from faststream import FastStream
+from faststream.kafka import KafkaBroker
+from config import settings
 
-# Load environment variables
-load_dotenv()
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Config
-BOT_TOKEN = os.getenv("BOT_TOKEN", "token")
-KAFKA_BOOTSTRAP_SERVERS = os.getenv(
-    "KAFKA_BOOTSTRAP_SERVERS", "kafka:29092"
-).split(",")
-PROXY_URL = os.getenv("PROXY_URL", "http://127.0.0.1:10808")
+BOT_TOKEN = settings.BOT_TOKEN
+KAFKA_BOOTSTRAP_SERVERS = settings.KAFKA_BOOTSTRAP_SERVERS
+PROXY_URL = settings.PROXY_URL
+
 session = AiohttpSession(proxy=PROXY_URL)
 bot = Bot(token=BOT_TOKEN, session=session)
 dp = Dispatcher()
-# Global bot instance for Kafka consumer
-# _bot: Bot = None
 
+# FastStream Broker and App for Kafka
+broker = KafkaBroker(KAFKA_BOOTSTRAP_SERVERS)
+app = FastStream(broker)
 
+@dp.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     """Handle /start command - sends greeting and user's TG ID."""
     await message.answer(
@@ -42,76 +41,43 @@ async def cmd_start(message: Message) -> None:
     )
 
 
-async def consume_kafka(bot: Bot) -> None:
-    """Consume messages from 'magiclink' Kafka topic and send links to TG users."""
-    consumer = AIOKafkaConsumer(
-        "magiclink",
-        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-    )
-    
-    await consumer.start()
-    logger.info("Kafka consumer started for topic 'magiclink'")
-
+@broker.subscriber("magiclink", group_id="aiogram_bot_group", auto_offset_reset="earliest")
+async def handle_magiclink(payload_str: str) -> None:
+    """Handles messages from the 'magiclink' topic using FastStream."""
+    # FastStream получает строку. Мы должны вручную декодировать её из JSON,
+    # так как продюсер отправляет уже закодированную строку.
     try:
-        async for msg in consumer:
-            try:
-                payload = msg.value
-                payload = json.loads(payload)
-                tg_id = payload.get("email")  # 'email' field contains TG ID
-                link = payload.get("link")    # 'link' field contains the link
+        payload: dict = json.loads(payload_str)
 
-                if tg_id is None or link is None:
-                    logger.warning(
-                        "Missing 'email' or 'link' field in Kafka message: %s",
-                        payload,
-                    )
-                    continue
+        tg_id = payload.get("tg_id")  # 'email' field contains TG ID
+        link = payload.get("link")  # 'link' field contains the link
 
-                tg_id_int = int(tg_id)
-                await bot.send_message(tg_id_int, text=f"Ссылка: {link}")
-                logger.info("Sent link to TG ID %s: %s", tg_id_int, link)
+        if tg_id is None or link is None:
+            logger.warning("Missing 'email' or 'link' field in Kafka message: %s", payload)
+            return
 
-            except (ValueError, KeyError) as exc:
-                logger.error("Error processing Kafka message: %s", exc)
-            except Exception as exc:
-                logger.error("Error sending message to TG: %s", exc)
-    finally:
-        await consumer.stop()
-        logger.info("Kafka consumer stopped")
+        tg_id_int = int(tg_id)
+        await bot.send_message(tg_id_int, text=f"Ссылка: {link}")
+        logger.info("Sent link to TG ID %s: %s", tg_id_int, link)
+
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.error("Error processing Kafka message payload: %s. Payload: %s", exc, payload)
+    except Exception as exc:
+        logger.error("An unexpected error occurred while sending message to TG: %s", exc, exc_info=True)
 
 
-async def on_startup(bot: Bot) -> asyncio.Task:
-    """Startup Kafka consumer."""
-    task = asyncio.create_task(consume_kafka(bot))
-    logger.info("Kafka consumer task created")
-    return task
-
-
-async def on_shutdown(bot: Bot, kafka_task: asyncio.Task) -> None:
-    """Gracefully shutdown bot and background tasks."""
-    logger.info("Shutting down...")
-    if kafka_task:
-        kafka_task.cancel()
-        try:
-            await kafka_task
-        except asyncio.CancelledError:
-            logger.info("Kafka consumer task cancelled.")
-    await bot.session.close()
-    logger.info("Bot shutdown complete")
-
+async def run_kafka_consumer() -> None:
+    """Starts the FastStream application."""
+    logger.info("Starting FastStream Kafka consumer...")
+    await app.run()
 
 async def run_bot() -> None:
     """Run the bot with polling."""
-    dp.message(cmd_start)(Command("start"))
-    kafka_consumer_task = await on_startup(bot)
-    logger.info("Bot is starting...")
-    await bot.delete_webhook(drop_pending_updates=True)
-
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await on_shutdown(bot, kafka_consumer_task)
+    # Запускаем aiogram и FastStream параллельно
+    await asyncio.gather(
+        dp.start_polling(bot),
+        run_kafka_consumer()
+    )
 
 
 def run() -> None:
@@ -119,7 +85,7 @@ def run() -> None:
     try:
         asyncio.run(run_bot())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        logger.info("Application stopped by user")
     except Exception as exc:
         logger.error("Fatal error: %s", exc)
 
